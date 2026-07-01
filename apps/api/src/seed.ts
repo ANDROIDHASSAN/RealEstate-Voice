@@ -80,7 +80,8 @@ export async function seedDemo(): Promise<{ accountId: string }> {
       consent: { sms: true, call: true, whatsapp: true, email: true },
       lastContactedAt: createdAt,
     });
-    await Lead.updateOne({ _id: lead._id }, { $set: { createdAt } }, { timestamps: false });
+    // createdAt is immutable in Mongoose — backdate via the raw collection.
+    await Lead.collection.updateOne({ _id: lead._id }, { $set: { createdAt, updatedAt: createdAt } });
     leads.push(lead);
   }
 

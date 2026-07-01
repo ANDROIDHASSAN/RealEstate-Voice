@@ -8,6 +8,9 @@ build/
 coverage/
 playwright-report/
 test-results/
+.playwright-mcp/
+dashboard*.png
+chart.png
 .mongodb-binaries/
 __pycache__/
 .venv/

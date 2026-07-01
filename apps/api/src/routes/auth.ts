@@ -102,6 +102,19 @@ authRouter.post('/refresh', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Dev/demo-only: seed the demo Empire account into the running DB (needed
+ * because local dev uses in-memory Mongo). Disabled in production unless
+ * ALLOW_DEMO_SEED=1 (used on the deployed demo).
+ */
+authRouter.post('/seed-demo', async (_req: Request, res: Response) => {
+  if (env.nodeEnv === 'production' && process.env.ALLOW_DEMO_SEED !== '1')
+    return res.status(404).json({ error: 'not_found' });
+  const { seedDemo } = await import('../seed.js');
+  const result = await seedDemo();
+  return res.json({ ...result, email: 'demo@closeflow.io', password: 'Demo1234!' });
+});
+
 authRouter.post('/logout', requireAuth, async (req: Request, res: Response) => {
   await User.updateOne({ _id: req.auth!.userId }, { $set: { refreshTokens: [] } });
   res.clearCookie(REFRESH_COOKIE, { path: '/auth' });

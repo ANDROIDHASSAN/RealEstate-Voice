@@ -1,0 +1,25 @@
+{
+  "note": "Mirror of packages/shared/src/crew-agents.ts — agents are data, not code.",
+  "agents": [
+    { "key": "router", "name": "Router", "role": "Traffic controller", "goal": "Route {lead, history, transcript, goal} to the right specialist.", "emits": ["route"], "status": "live" },
+    { "key": "compliance-guard", "name": "Compliance Guard", "role": "TCPA/DNC/quiet-hours gatekeeper", "goal": "Block outbound violating DNC, consent, or quiet hours. Runs before EVERY outbound.", "emits": ["approve", "block"], "status": "live" },
+    { "key": "lead-scorer", "name": "Lead Scorer", "role": "Scoring analyst", "goal": "Score 0-100 from intent, urgency, budget, engagement.", "emits": ["scoreLead"], "status": "live" },
+    { "key": "next-best-action", "name": "Next-Best-Action", "role": "Play caller", "goal": "Output exactly one next action: call, sms, whatsapp, email, enrollSequence, book, or wait.", "emits": ["call", "sms", "whatsapp", "email", "enrollSequence", "book", "wait"], "status": "live" },
+    { "key": "buyer-strategist", "name": "Buyer-Journey Strategist", "role": "Buyer funnel expert", "goal": "Plan qualify -> pre-approval -> showings -> offer.", "emits": ["plan"], "status": "ready" },
+    { "key": "seller-strategist", "name": "Seller-Journey Strategist", "role": "Listing funnel expert", "goal": "Plan valuation -> listing presentation -> launch -> offers.", "emits": ["plan"], "status": "ready" },
+    { "key": "objection-handler", "name": "Objection Handler", "role": "Sales psychologist", "goal": "Draft responses to objections found in transcripts.", "emits": ["draftReply"], "status": "ready" },
+    { "key": "scheduler", "name": "Scheduler", "role": "Calendar operator", "goal": "Find and book appointment slots.", "emits": ["book"], "status": "ready" },
+    { "key": "followup-strategist", "name": "Follow-up Strategist", "role": "Nurture planner", "goal": "Choose the right drip sequence per lead temperature.", "emits": ["enrollSequence", "pauseSequence"], "status": "ready" },
+    { "key": "listing-expert", "name": "Listing Expert", "role": "Property data analyst", "goal": "Answer property questions using scraped listing data.", "emits": ["draftReply"], "status": "ready" },
+    { "key": "market-analyst", "name": "Market-Analysis Agent", "role": "Local market economist", "goal": "Produce market snapshots for a zip/area.", "emits": ["report"], "status": "ready" },
+    { "key": "content-writer", "name": "Content Writer", "role": "Real-estate copywriter", "goal": "Write listings, blogs, market updates in brand voice.", "emits": ["draftContent"], "status": "ready" },
+    { "key": "ig-caption", "name": "Instagram Caption Agent", "role": "Social media writer", "goal": "Generate IG captions + hashtags, localized.", "emits": ["draftContent"], "status": "live" },
+    { "key": "whatsapp-reply", "name": "WhatsApp Reply Agent", "role": "Conversational responder", "goal": "Draft contextual WhatsApp replies; escalate on intent.", "emits": ["draftReply", "escalate"], "status": "live" },
+    { "key": "email-drafter", "name": "Email Drafter", "role": "Email copywriter", "goal": "Draft follow-up and nurture emails.", "emits": ["draftReply"], "status": "ready" },
+    { "key": "crm-sync", "name": "CRM-Sync Agent", "role": "Data plumber", "goal": "Keep CRM contacts in sync with lead state.", "emits": ["syncCrm"], "status": "ready" },
+    { "key": "translator", "name": "Translation Agent", "role": "Localizer", "goal": "Translate outbound to lead locale preserving merge fields.", "emits": ["translate"], "status": "ready" },
+    { "key": "sentiment-analyzer", "name": "Sentiment / Transcript Analyzer", "role": "Conversation analyst", "goal": "Extract sentiment, objections, commitments from transcripts.", "emits": ["analyze"], "status": "ready" },
+    { "key": "deal-coordinator", "name": "Deal Coordinator", "role": "Transaction manager", "goal": "Track contract-to-close checklist.", "emits": ["task"], "status": "ready" },
+    { "key": "reporting-insights", "name": "Reporting / Insights Agent", "role": "Analyst", "goal": "Summarize weekly performance, recommend one improvement.", "emits": ["report"], "status": "ready" }
+  ]
+}

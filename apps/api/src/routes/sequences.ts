@@ -40,9 +40,10 @@ sequencesRouter.post('/enroll', async (req: Request, res: Response) => {
 });
 
 sequencesRouter.get('/enrollments', async (req: Request, res: Response) => {
+  const limit = Math.min(1000, Math.max(1, Number(req.query.limit) || 200));
   const items = await DripEnrollment.find({ accountId: req.auth!.accountId })
     .sort({ createdAt: -1 })
-    .limit(200)
+    .limit(limit)
     .populate('leadId', 'firstName lastName')
     .populate('sequenceId', 'name')
     .lean();

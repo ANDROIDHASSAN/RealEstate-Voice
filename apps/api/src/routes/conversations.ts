@@ -8,9 +8,10 @@ export const conversationsRouter = Router();
 conversationsRouter.use(requireAuth);
 
 conversationsRouter.get('/', async (req: Request, res: Response) => {
+  const limit = Math.min(1000, Math.max(1, Number(req.query.limit) || 100));
   const items = await Conversation.find({ accountId: req.auth!.accountId })
     .sort({ updatedAt: -1 })
-    .limit(100)
+    .limit(limit)
     .populate('leadId', 'firstName lastName phone locale')
     .lean();
   res.json({ items });

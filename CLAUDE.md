@@ -14,7 +14,8 @@
 - DO NOT: one-shot all modules blindly, orchestrate agents in Node (that's `services/agents`), send outbound without ComplianceGuard, go monochrome.
 
 ## Commands
-- `npm run dev` — boots api (:4000) + web (:5173) locally (in-memory Mongo + in-memory queue when env keys are empty).
+- `npm run dev` — boots api (:4100 — 4000 is taken by another local app) + web (:5173+) locally (in-memory Mongo + queue when MONGO_URI/REDIS_URL unusable).
+- Tests always run with `FORCE_MOCK_PROVIDERS=1` — the .env holds REAL provider keys; never let tests place real calls/SMS.
 - `npm run build` — builds shared, api, web.
 - `npm run test` — API integration tests (vitest + supertest).
 - `npm run e2e` — Playwright E2E (starts servers itself).

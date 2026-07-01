@@ -1,0 +1,66 @@
+# Render blueprint — API (Node) + Agents (Python). Free tier: services cold-start
+# after 15 min idle; /health + an external keep-warm ping (cron-job.org) mitigate.
+services:
+  - type: web
+    name: closeflow-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build -w packages/shared && npm run build -w packages/integrations && npm run build -w services/voice && npm run build -w apps/api
+    startCommand: node apps/api/dist/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4100"
+      - key: MONGO_URI
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: APP_URL
+        sync: false # set to the Vercel URL
+      - key: AGENTS_SERVICE_URL
+        fromService:
+          type: web
+          name: closeflow-agents
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: ALLOW_DEMO_SEED
+        value: "1"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: APIFY_TOKEN
+        sync: false
+      - key: VOICE_PROVIDER
+        value: mock # switch to dograh/vapi once telephony is verified
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+
+  - type: web
+    name: closeflow-agents
+    runtime: python
+    plan: free
+    rootDir: services/agents
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
