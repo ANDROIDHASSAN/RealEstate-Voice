@@ -1,0 +1,144 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "leads": "Leads",
+    "voice": "Voice Agents",
+    "followup": "Follow-up",
+    "inbox": "Inbox",
+    "leadEngine": "Lead Engine",
+    "content": "Content Studio",
+    "agents": "AI Team",
+    "website": "Website",
+    "billing": "Billing",
+    "settings": "Settings",
+    "logout": "Log out"
+  },
+  "dashboard": {
+    "greeting": "Welcome back, {{name}}",
+    "subtitle": "Here is your business at a glance",
+    "speedToLead": "Speed to lead",
+    "speedToLeadUnit": "median first response",
+    "leadsThisWeek": "New leads this week",
+    "callsBooked": "Appointments booked",
+    "replyRate": "Reply rate",
+    "pipeline": "Pipeline",
+    "activity": "Response speed",
+    "greatResult": "Great result!",
+    "recentLeads": "Recent leads",
+    "viewAll": "View all"
+  },
+  "leads": {
+    "title": "Leads",
+    "subtitle": "Every lead, answered in seconds",
+    "addLead": "Add lead",
+    "search": "Search leads…",
+    "empty": "No leads yet",
+    "emptyHint": "Point your Zillow, Facebook, and website forms at your intake webhook — new leads get an instant reply automatically.",
+    "status": { "new": "New", "contacted": "Contacted", "qualified": "Qualified", "appointment": "Appointment", "nurture": "Nurture", "won": "Won", "lost": "Lost", "dnc": "Do not contact" },
+    "firstResponse": "First response",
+    "source": "Source",
+    "score": "Score",
+    "callNow": "Call with AI",
+    "enroll": "Enroll in follow-up"
+  },
+  "voice": {
+    "title": "Voice Agents",
+    "subtitle": "Your 24/7 multilingual calling team",
+    "live": "Live",
+    "ready": "Ready",
+    "recentCalls": "Recent calls",
+    "outcomes": "Call outcomes",
+    "transcript": "Transcript",
+    "noCalls": "No calls yet",
+    "noCallsHint": "Trigger a qualifier call from any lead — the agent qualifies, books, and logs the transcript here."
+  },
+  "followup": {
+    "title": "Follow-up Autopilot",
+    "subtitle": "Sequences that never forget a lead",
+    "newSequence": "New sequence",
+    "steps": "steps",
+    "enrollments": "Active enrollments",
+    "empty": "No sequences yet",
+    "emptyHint": "Create a sequence and every new lead can be nurtured automatically across SMS, WhatsApp, and email."
+  },
+  "inbox": {
+    "title": "Inbox",
+    "subtitle": "WhatsApp, SMS & email in one place",
+    "aiHandling": "AI handling",
+    "human": "You",
+    "reply": "Reply…",
+    "send": "Send",
+    "empty": "No conversations yet"
+  },
+  "leadEngine": {
+    "title": "Lead Engine",
+    "subtitle": "Fresh prospects on demand",
+    "newJob": "New scrape job",
+    "found": "found",
+    "imported": "imported",
+    "empty": "No scrape jobs yet",
+    "emptyHint": "Scrape FSBO, expired listings, or Google Maps areas — validated prospects flow straight into your pipeline."
+  },
+  "content": {
+    "title": "Content Studio",
+    "subtitle": "Captions, posts and video on autopilot",
+    "generate": "Generate captions",
+    "topic": "What is the post about?",
+    "schedule": "Schedule post",
+    "calendar": "Content calendar",
+    "video": "Video requests",
+    "pendingReview": "Publishing pending Meta App Review — scheduled posts are logged by the stub adapter."
+  },
+  "agents": {
+    "title": "AI Team",
+    "subtitle": "20 specialists working your pipeline",
+    "run": "Ask the team",
+    "goal": "What should the team achieve?",
+    "recentRuns": "Recent decisions",
+    "action": "Next best action"
+  },
+  "billing": {
+    "title": "Billing",
+    "subtitle": "Pick the modules you pay for",
+    "current": "Current plan",
+    "upgrade": "Upgrade",
+    "subscribe": "Choose plan",
+    "usage": "Usage this month",
+    "mockNote": "Stripe key not set — plan changes apply instantly in test mode."
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Account, compliance & integrations",
+    "providers": "Integrations",
+    "needsKey": "Needs API key",
+    "connected": "Connected",
+    "compliance": "Compliance",
+    "quietHours": "Quiet hours",
+    "dncList": "Do-not-contact list",
+    "language": "Dashboard language"
+  },
+  "auth": {
+    "login": "Log in",
+    "signup": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "name": "Your name",
+    "company": "Team / brokerage name",
+    "welcome": "Run your entire real estate business on autopilot",
+    "tagline": "Answer every lead in seconds. Qualify by AI voice. Follow up forever.",
+    "noAccount": "No account yet?",
+    "haveAccount": "Already have an account?"
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "create": "Create",
+    "locked": "Included in {{plan}}",
+    "lockedHint": "This module is not in your current plan.",
+    "upgradeCta": "See plans",
+    "mock": "Test mode"
+  }
+}

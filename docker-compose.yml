@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7
+    ports: ["27017:27017"]
+    volumes: [mongo-data:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: .env
+    environment:
+      MONGO_URI: mongodb://mongo:27017/closeflow
+      REDIS_URL: redis://redis:6379
+      AGENTS_SERVICE_URL: http://agents:8000
+    ports: ["4000:4000"]
+    depends_on:
+      mongo: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  agents:
+    build:
+      context: services/agents
+    env_file: .env
+    ports: ["8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:4000
+    ports: ["5173:80"]
+    depends_on: [api]
+
+volumes:
+  mongo-data:

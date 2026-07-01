@@ -1,0 +1,49 @@
+import type { CallOutcome, Locale } from '@closeflow/shared';
+
+export interface VoiceCallRequest {
+  /** Our internal Call id — echoed back in events. */
+  callRef: string;
+  to: string;
+  agentKey: string;
+  locale: Locale;
+  /** Script with {{merge}} fields already resolved by the API. */
+  resolvedScript: string[];
+  voiceId: string;
+  tools: string[];
+  transferRule: string;
+  metadata?: Record<string, string>;
+}
+
+export interface TranscriptTurn {
+  role: 'agent' | 'lead';
+  text: string;
+  ts: number;
+}
+
+export interface VoiceCallResult {
+  callRef: string;
+  providerCallId: string;
+  status: 'completed' | 'failed';
+  durationSec: number;
+  transcript: TranscriptTurn[];
+  summary: string;
+  outcome: CallOutcome;
+  recordingUrl?: string;
+  /** Structured data the agent extracted (budget, timeline, requested slot…). */
+  extracted: Record<string, string>;
+}
+
+export type CallEventHandler = (result: VoiceCallResult) => Promise<void>;
+
+/**
+ * VoiceProvider — the ONLY surface business logic may touch.
+ * Adapters: dograh (default self-host), gemini-live, vapi, mock.
+ */
+export interface VoiceProvider {
+  readonly name: string;
+  readonly live: boolean;
+  readonly reason?: string;
+  startOutboundCall(req: VoiceCallRequest): Promise<{ providerCallId: string }>;
+  /** Register the single handler invoked when a call finishes. */
+  onCallComplete(handler: CallEventHandler): void;
+}

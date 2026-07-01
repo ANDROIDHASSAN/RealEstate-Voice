@@ -1,0 +1,144 @@
+{
+  "nav": {
+    "dashboard": "Painel",
+    "leads": "Leads",
+    "voice": "Agentes de voz",
+    "followup": "Follow-up",
+    "inbox": "Caixa de entrada",
+    "leadEngine": "Motor de leads",
+    "content": "Estúdio de conteúdo",
+    "agents": "Time de IA",
+    "website": "Site",
+    "billing": "Cobrança",
+    "settings": "Configurações",
+    "logout": "Sair"
+  },
+  "dashboard": {
+    "greeting": "Bem-vindo de volta, {{name}}",
+    "subtitle": "Seu negócio em um relance",
+    "speedToLead": "Velocidade de resposta",
+    "speedToLeadUnit": "primeira resposta (mediana)",
+    "leadsThisWeek": "Novos leads esta semana",
+    "callsBooked": "Reuniões agendadas",
+    "replyRate": "Taxa de resposta",
+    "pipeline": "Pipeline",
+    "activity": "Velocidade de resposta",
+    "greatResult": "Ótimo resultado!",
+    "recentLeads": "Leads recentes",
+    "viewAll": "Ver todos"
+  },
+  "leads": {
+    "title": "Leads",
+    "subtitle": "Cada lead respondido em segundos",
+    "addLead": "Adicionar lead",
+    "search": "Buscar leads…",
+    "empty": "Nenhum lead ainda",
+    "emptyHint": "Aponte seus formulários do Zillow, Facebook e site para o webhook de entrada — novos leads recebem resposta instantânea.",
+    "status": { "new": "Novo", "contacted": "Contatado", "qualified": "Qualificado", "appointment": "Reunião", "nurture": "Nutrição", "won": "Ganho", "lost": "Perdido", "dnc": "Não contatar" },
+    "firstResponse": "Primeira resposta",
+    "source": "Origem",
+    "score": "Pontuação",
+    "callNow": "Ligar com IA",
+    "enroll": "Inscrever no follow-up"
+  },
+  "voice": {
+    "title": "Agentes de voz",
+    "subtitle": "Seu time de ligações multilíngue 24/7",
+    "live": "Ativo",
+    "ready": "Pronto",
+    "recentCalls": "Ligações recentes",
+    "outcomes": "Resultados",
+    "transcript": "Transcrição",
+    "noCalls": "Nenhuma ligação ainda",
+    "noCallsHint": "Dispare uma ligação de qualificação de qualquer lead — o agente qualifica, agenda e registra a transcrição aqui."
+  },
+  "followup": {
+    "title": "Follow-up automático",
+    "subtitle": "Sequências que nunca esquecem um lead",
+    "newSequence": "Nova sequência",
+    "steps": "passos",
+    "enrollments": "Inscrições ativas",
+    "empty": "Nenhuma sequência ainda",
+    "emptyHint": "Crie uma sequência e cada novo lead será nutrido automaticamente por SMS, WhatsApp e email."
+  },
+  "inbox": {
+    "title": "Caixa de entrada",
+    "subtitle": "WhatsApp, SMS e email em um só lugar",
+    "aiHandling": "IA respondendo",
+    "human": "Você",
+    "reply": "Responder…",
+    "send": "Enviar",
+    "empty": "Nenhuma conversa ainda"
+  },
+  "leadEngine": {
+    "title": "Motor de leads",
+    "subtitle": "Prospects novos sob demanda",
+    "newJob": "Novo trabalho",
+    "found": "encontrados",
+    "imported": "importados",
+    "empty": "Nenhum trabalho ainda",
+    "emptyHint": "Extraia FSBO, anúncios expirados ou áreas do Google Maps — prospects validados entram direto no seu pipeline."
+  },
+  "content": {
+    "title": "Estúdio de conteúdo",
+    "subtitle": "Legendas, posts e vídeo no automático",
+    "generate": "Gerar legendas",
+    "topic": "Sobre o que é o post?",
+    "schedule": "Agendar post",
+    "calendar": "Calendário de conteúdo",
+    "video": "Pedidos de vídeo",
+    "pendingReview": "Publicação aguardando revisão da Meta — posts agendados são registrados pelo adaptador stub."
+  },
+  "agents": {
+    "title": "Time de IA",
+    "subtitle": "20 especialistas trabalhando seu pipeline",
+    "run": "Perguntar ao time",
+    "goal": "O que o time deve alcançar?",
+    "recentRuns": "Decisões recentes",
+    "action": "Próxima melhor ação"
+  },
+  "billing": {
+    "title": "Cobrança",
+    "subtitle": "Escolha os módulos que você paga",
+    "current": "Plano atual",
+    "upgrade": "Fazer upgrade",
+    "subscribe": "Escolher plano",
+    "usage": "Uso este mês",
+    "mockNote": "Sem chave Stripe — mudanças de plano aplicam na hora em modo de teste."
+  },
+  "settings": {
+    "title": "Configurações",
+    "subtitle": "Conta, conformidade e integrações",
+    "providers": "Integrações",
+    "needsKey": "Precisa de chave API",
+    "connected": "Conectado",
+    "compliance": "Conformidade",
+    "quietHours": "Horário de silêncio",
+    "dncList": "Lista de não contato",
+    "language": "Idioma do painel"
+  },
+  "auth": {
+    "login": "Entrar",
+    "signup": "Criar conta",
+    "email": "Email",
+    "password": "Senha",
+    "name": "Seu nome",
+    "company": "Nome do time / imobiliária",
+    "welcome": "Gerencie todo o seu negócio imobiliário no piloto automático",
+    "tagline": "Responda cada lead em segundos. Qualifique com voz de IA. Faça follow-up para sempre.",
+    "noAccount": "Ainda não tem conta?",
+    "haveAccount": "Já tem uma conta?"
+  },
+  "common": {
+    "loading": "Carregando…",
+    "error": "Algo deu errado",
+    "retry": "Tentar novamente",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "create": "Criar",
+    "locked": "Incluído no {{plan}}",
+    "lockedHint": "Este módulo não está no seu plano atual.",
+    "upgradeCta": "Ver planos",
+    "mock": "Modo de teste"
+  }
+}

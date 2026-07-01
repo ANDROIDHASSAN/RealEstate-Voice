@@ -1,0 +1,144 @@
+{
+  "nav": {
+    "dashboard": "Tablo",
+    "leads": "Kliyan potansyèl",
+    "voice": "Ajan vwa",
+    "followup": "Swivi",
+    "inbox": "Bwat mesaj",
+    "leadEngine": "Motè kliyan",
+    "content": "Estidyo kontni",
+    "agents": "Ekip IA",
+    "website": "Sit entènèt",
+    "billing": "Faktirasyon",
+    "settings": "Paramèt",
+    "logout": "Dekonekte"
+  },
+  "dashboard": {
+    "greeting": "Byenveni ankò, {{name}}",
+    "subtitle": "Biznis ou an yon koudèy",
+    "speedToLead": "Vitès repons",
+    "speedToLeadUnit": "premye repons (medyàn)",
+    "leadsThisWeek": "Nouvo kliyan semèn sa a",
+    "callsBooked": "Randevou pwograme",
+    "replyRate": "To repons",
+    "pipeline": "Pipeline",
+    "activity": "Vitès repons",
+    "greatResult": "Bèl rezilta!",
+    "recentLeads": "Dènye kliyan yo",
+    "viewAll": "Wè tout"
+  },
+  "leads": {
+    "title": "Kliyan potansyèl",
+    "subtitle": "Chak kliyan jwenn repons nan segonn",
+    "addLead": "Ajoute kliyan",
+    "search": "Chèche…",
+    "empty": "Poko gen kliyan",
+    "emptyHint": "Konekte fòm Zillow, Facebook ak sit ou a sou webhook la — chak nouvo kliyan ap jwenn repons otomatik.",
+    "status": { "new": "Nouvo", "contacted": "Kontakte", "qualified": "Kalifye", "appointment": "Randevou", "nurture": "Swivi", "won": "Genyen", "lost": "Pèdi", "dnc": "Pa kontakte" },
+    "firstResponse": "Premye repons",
+    "source": "Sous",
+    "score": "Nòt",
+    "callNow": "Rele ak IA",
+    "enroll": "Enskri nan swivi"
+  },
+  "voice": {
+    "title": "Ajan vwa",
+    "subtitle": "Ekip apèl milti-lang ou 24/7",
+    "live": "Aktif",
+    "ready": "Pare",
+    "recentCalls": "Dènye apèl yo",
+    "outcomes": "Rezilta apèl",
+    "transcript": "Transkripsyon",
+    "noCalls": "Poko gen apèl",
+    "noCallsHint": "Lanse yon apèl kalifikasyon sou nenpòt kliyan — ajan an kalifye, pwograme epi anrejistre transkripsyon an isit la."
+  },
+  "followup": {
+    "title": "Swivi otomatik",
+    "subtitle": "Sekans ki pa janm bliye yon kliyan",
+    "newSequence": "Nouvo sekans",
+    "steps": "etap",
+    "enrollments": "Enskripsyon aktif",
+    "empty": "Poko gen sekans",
+    "emptyHint": "Kreye yon sekans epi chak nouvo kliyan ap jwenn swivi otomatik sou SMS, WhatsApp ak imel."
+  },
+  "inbox": {
+    "title": "Bwat mesaj",
+    "subtitle": "WhatsApp, SMS ak imel nan yon sèl kote",
+    "aiHandling": "IA ap reponn",
+    "human": "Ou menm",
+    "reply": "Reponn…",
+    "send": "Voye",
+    "empty": "Poko gen konvèsasyon"
+  },
+  "leadEngine": {
+    "title": "Motè kliyan",
+    "subtitle": "Nouvo pwospè sou demann",
+    "newJob": "Nouvo travay",
+    "found": "jwenn",
+    "imported": "enpòte",
+    "empty": "Poko gen travay",
+    "emptyHint": "Rale FSBO, lis ki ekspire oswa zòn Google Maps — pwospè valide antre dirèk nan pipeline ou."
+  },
+  "content": {
+    "title": "Estidyo kontni",
+    "subtitle": "Legend, pòs ak videyo otomatik",
+    "generate": "Jenere legend",
+    "topic": "Sou kisa pòs la ye?",
+    "schedule": "Pwograme pòs",
+    "calendar": "Kalandriye kontni",
+    "video": "Demann videyo",
+    "pendingReview": "Piblikasyon ap tann revizyon Meta — pòs pwograme yo anrejistre pa adaptè stub la."
+  },
+  "agents": {
+    "title": "Ekip IA",
+    "subtitle": "20 espesyalis k ap travay pipeline ou",
+    "run": "Mande ekip la",
+    "goal": "Kisa ekip la dwe akonpli?",
+    "recentRuns": "Dènye desizyon yo",
+    "action": "Pwochen pi bon aksyon"
+  },
+  "billing": {
+    "title": "Faktirasyon",
+    "subtitle": "Chwazi modil ou peye yo",
+    "current": "Plan aktyèl",
+    "upgrade": "Amelyore",
+    "subscribe": "Chwazi plan",
+    "usage": "Itilizasyon mwa sa a",
+    "mockNote": "Pa gen kle Stripe — chanjman plan aplike imedyatman an mòd tès."
+  },
+  "settings": {
+    "title": "Paramèt",
+    "subtitle": "Kont, konfòmite ak entegrasyon",
+    "providers": "Entegrasyon",
+    "needsKey": "Bezwen kle API",
+    "connected": "Konekte",
+    "compliance": "Konfòmite",
+    "quietHours": "Lè silans",
+    "dncList": "Lis pa-kontakte",
+    "language": "Lang tablo a"
+  },
+  "auth": {
+    "login": "Konekte",
+    "signup": "Kreye kont",
+    "email": "Imel",
+    "password": "Modpas",
+    "name": "Non ou",
+    "company": "Non ekip / ajans lan",
+    "welcome": "Jere tout biznis imobilye ou sou pilòt otomatik",
+    "tagline": "Reponn chak kliyan nan segonn. Kalifye ak vwa IA. Swiv pou tout tan.",
+    "noAccount": "Ou poko gen kont?",
+    "haveAccount": "Ou gen yon kont deja?"
+  },
+  "common": {
+    "loading": "Chajman…",
+    "error": "Yon bagay pa mache",
+    "retry": "Eseye ankò",
+    "save": "Sove",
+    "cancel": "Anile",
+    "create": "Kreye",
+    "locked": "Enkli nan {{plan}}",
+    "lockedHint": "Modil sa a pa nan plan aktyèl ou.",
+    "upgradeCta": "Wè plan yo",
+    "mock": "Mòd tès"
+  }
+}

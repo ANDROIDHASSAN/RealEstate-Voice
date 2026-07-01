@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-app: #d6f0e3;
+  --surface: #fbf8f4;
+  --surface-2: #f4eee7;
+  --card-pink: #f9dcdc;
+  --card-yellow: #fcebcb;
+  --card-purple: #e6ddf8;
+  --card-green: #d2ecdb;
+  --card-blue: #d9e7f7;
+  --ink: #1a1a1a;
+  --ink-soft: #6b6b6b;
+  --accent: #111111;
+  --accent-on: #ffffff;
+  --radius-card: 24px;
+  --radius-pill: 999px;
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.05);
+}
+
+html {
+  font-family: 'Poppins', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+}
+
+html[dir='rtl'] {
+  font-family: 'IBM Plex Sans Arabic', 'Cairo', 'Poppins', sans-serif;
+}
+
+body {
+  @apply bg-app text-ink antialiased;
+}
+
+h1, h2, h3 {
+  @apply font-semibold tracking-tight;
+}
+
+::selection {
+  background: var(--card-purple);
+}
+
+/* Soft scrollbars to match the pastel surfaces */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
