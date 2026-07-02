@@ -1,5 +1,8 @@
 import type { CallEventHandler, VoiceCallRequest, VoiceProvider } from './types.js';
 
+const env = (name: string, fallback: string): string =>
+  ((process.env[name] ?? '').replace(/\s+#.*$/, '').trim() || fallback);
+
 /** Vapi adapter (optional fallback). Completion via /webhook/voice/vapi. */
 export class VapiVoiceProvider implements VoiceProvider {
   readonly name = 'vapi';
@@ -29,12 +32,15 @@ export class VapiVoiceProvider implements VoiceProvider {
         customer: { number: req.to },
         assistant: {
           firstMessage: req.resolvedScript[0],
+          // In-call brain, voice (TTS) and transcriber (STT) are all
+          // configurable from Settings; sensible defaults keep it working.
           model: {
-            provider: 'groq',
-            model: 'llama-3.3-70b-versatile',
+            provider: env('VOICE_LLM_PROVIDER', 'groq'),
+            model: env('VOICE_LLM_MODEL', 'llama-3.3-70b-versatile'),
             systemPrompt: `You are a real-estate assistant. Follow this script:\n${req.resolvedScript.join('\n')}\nTransfer rule: ${req.transferRule}`,
           },
-          voice: { provider: '11labs', voiceId: req.voiceId },
+          voice: { provider: env('VOICE_TTS_PROVIDER', '11labs'), voiceId: env('VOICE_TTS_VOICE', req.voiceId) },
+          transcriber: { provider: env('VOICE_STT_PROVIDER', 'deepgram') },
         },
         metadata: { ...req.metadata, callRef: req.callRef },
       }),

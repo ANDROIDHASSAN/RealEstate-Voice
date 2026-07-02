@@ -32,3 +32,22 @@
 25. **Assistant** (`POST /assistant/command`): the LLM only *plans* (closed, Zod-validated action set); Node *executes* through the same queue + ComplianceGuard paths as the UI. With no LLM key a deterministic English rule parser handles the core commands so voice control works keyless. Voice I/O is browser-native (Web Speech API + speechSynthesis) — no audio keys needed, degrades to typed input where unsupported.
 26. **Lead Engine presets** live in `packages/shared/src/lead-personas.ts` (12 top prospect segments with source/query/filter defaults) — config data, not code, per the agents-are-data rule. Scrape `filters` are persisted on the job and forwarded to Apify when live; the mock dataset ignores them (labeled sample data).
 27. **Onboarding tour** is client-side only (`cf-onboarded` localStorage flag) with a replay button in the header; no server state.
+
+## 2026-07-02 — Selectable LLM / voice providers & models
+
+28. **Provider + model dropdowns** are declared as `options` on each entry in the
+    integrations catalog (`apps/api/src/routes/integrations.ts`) alongside the key
+    `fields`. They persist through the same per-account `IntegrationSetting` → env
+    mechanism as keys, but are constrained to their declared `choices`
+    (`OPTION_CHOICES`) so a saved selection can't inject an arbitrary value. They
+    are not secrets, so the current selection is returned in `GET /integrations`.
+29. **LLM is now a preference-ordered fallback across Gemini / Groq / OpenAI.**
+    `LLM_PROVIDER` (auto|gemini|groq|openai) picks which is tried first; each
+    provider's model is configurable (`GEMINI_MODEL` / `GROQ_MODEL` / `OPENAI_MODEL`).
+    OpenAI and Groq share one OpenAI-compatible client. Missing/bad keys still fall
+    through to the labeled mock — a selection never breaks AI features.
+30. **Voice pipeline is configurable** — call provider (`VOICE_PROVIDER`), TTS
+    (`VOICE_TTS_PROVIDER`/`VOICE_TTS_VOICE`), STT (`VOICE_STT_PROVIDER`), and the
+    in-call brain (`VOICE_LLM_PROVIDER`/`VOICE_LLM_MODEL`) are read by the Vapi
+    adapter instead of being hardcoded. Saving voice settings calls
+    `resetVoiceProvider()` so the cached singleton rebuilds without a restart.

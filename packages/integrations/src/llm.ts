@@ -13,16 +13,26 @@ export interface LLMProvider {
   complete(prompt: string, opts?: LLMCompleteOptions): Promise<string>;
 }
 
+// Default models per provider — overridable from Settings (env var per provider).
+const DEFAULT_MODELS = {
+  gemini: 'gemini-2.0-flash',
+  groq: 'llama-3.3-70b-versatile',
+  openai: 'gpt-4o-mini',
+} as const;
+
 class GeminiProvider implements LLMProvider {
   private get key() {
     return envVal('GEMINI_API_KEY');
   }
+  private get model() {
+    return envVal('GEMINI_MODEL') || DEFAULT_MODELS.gemini;
+  }
   get info(): ProviderInfo {
-    return { name: 'Gemini', live: !forceMock() && Boolean(this.key), reason: this.key ? undefined : 'GEMINI_API_KEY missing' };
+    return { name: `Gemini (${this.model})`, live: !forceMock() && Boolean(this.key), reason: this.key ? undefined : 'GEMINI_API_KEY missing' };
   }
   async complete(prompt: string, opts?: LLMCompleteOptions): Promise<string> {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.key}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -45,19 +55,36 @@ class GeminiProvider implements LLMProvider {
   }
 }
 
-class GroqProvider implements LLMProvider {
+/** OpenAI-compatible chat provider — used by both OpenAI and Groq (same API shape). */
+class OpenAICompatProvider implements LLMProvider {
+  constructor(
+    private opts: {
+      label: string;
+      keyVar: string;
+      modelVar: string;
+      defaultModel: string;
+      baseUrl: string;
+    },
+  ) {}
   private get key() {
-    return envVal('GROQ_API_KEY');
+    return envVal(this.opts.keyVar);
+  }
+  private get model() {
+    return envVal(this.opts.modelVar) || this.opts.defaultModel;
   }
   get info(): ProviderInfo {
-    return { name: 'Groq', live: !forceMock() && Boolean(this.key), reason: this.key ? undefined : 'GROQ_API_KEY missing' };
+    return {
+      name: `${this.opts.label} (${this.model})`,
+      live: !forceMock() && Boolean(this.key),
+      reason: this.key ? undefined : `${this.opts.keyVar} missing`,
+    };
   }
   async complete(prompt: string, opts?: LLMCompleteOptions): Promise<string> {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const res = await fetch(this.opts.baseUrl, {
       method: 'POST',
       headers: { Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: this.model,
         messages: [
           ...(opts?.system ? [{ role: 'system', content: opts.system }] : []),
           { role: 'user', content: prompt },
@@ -67,11 +94,29 @@ class GroqProvider implements LLMProvider {
         response_format: opts?.json ? { type: 'json_object' } : undefined,
       }),
     });
-    if (!res.ok) throw new Error(`Groq HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`${this.opts.label} HTTP ${res.status}`);
     const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     return data.choices?.[0]?.message?.content ?? '';
   }
 }
+
+const makeGroq = () =>
+  new OpenAICompatProvider({
+    label: 'Groq',
+    keyVar: 'GROQ_API_KEY',
+    modelVar: 'GROQ_MODEL',
+    defaultModel: DEFAULT_MODELS.groq,
+    baseUrl: 'https://api.groq.com/openai/v1/chat/completions',
+  });
+
+const makeOpenAI = () =>
+  new OpenAICompatProvider({
+    label: 'OpenAI',
+    keyVar: 'OPENAI_API_KEY',
+    modelVar: 'OPENAI_MODEL',
+    defaultModel: DEFAULT_MODELS.openai,
+    baseUrl: 'https://api.openai.com/v1/chat/completions',
+  });
 
 /**
  * [MOCK] Deterministic template LLM used when no key is configured.
@@ -80,32 +125,44 @@ class GroqProvider implements LLMProvider {
  */
 class MockLLMProvider implements LLMProvider {
   get info(): ProviderInfo {
-    return { name: 'Mock LLM', live: false, reason: 'No LLM key set (GEMINI_API_KEY / GROQ_API_KEY)' };
+    return { name: 'Mock LLM', live: false, reason: 'No LLM key set (Gemini / Groq / OpenAI)' };
   }
   async complete(prompt: string, opts?: LLMCompleteOptions): Promise<string> {
     if (opts?.json) {
-      return JSON.stringify({ mock: true, note: 'Set GEMINI_API_KEY or GROQ_API_KEY for live AI output.' });
+      return JSON.stringify({ mock: true, note: 'Set a Gemini, Groq or OpenAI key for live AI output.' });
     }
-    // Simple contextual echo used by auto-reply flows in mock mode.
     const firstLine = prompt.split('\n').find((l) => l.trim().length > 0) ?? '';
     return `Thanks for reaching out! A member of our team will follow up shortly. (Mock AI reply — context: "${firstLine.slice(0, 80)}")`;
   }
 }
 
+type ProviderKey = 'gemini' | 'groq' | 'openai';
+
 /**
- * Fallback chain: tries each live provider in order (Gemini → Groq), landing
- * on the mock only when all fail. A single bad key never breaks AI features.
+ * Fallback chain across all live providers, ordered by the account's preferred
+ * provider (LLM_PROVIDER = auto|gemini|groq|openai), landing on the mock only
+ * when all fail. A single bad key never breaks AI features.
  */
 class FallbackLLMProvider implements LLMProvider {
-  private candidates: LLMProvider[] = [new GeminiProvider(), new GroqProvider()];
   private mock = new MockLLMProvider();
 
+  private ordered(): { key: ProviderKey; provider: LLMProvider }[] {
+    const all: { key: ProviderKey; provider: LLMProvider }[] = [
+      { key: 'gemini', provider: new GeminiProvider() },
+      { key: 'groq', provider: makeGroq() },
+      { key: 'openai', provider: makeOpenAI() },
+    ];
+    const pref = (envVal('LLM_PROVIDER') || 'auto').toLowerCase() as ProviderKey | 'auto';
+    if (pref === 'auto') return all;
+    return [...all.filter((c) => c.key === pref), ...all.filter((c) => c.key !== pref)];
+  }
+
   get info(): ProviderInfo {
-    return this.candidates.find((c) => c.info.live)?.info ?? this.mock.info;
+    return this.ordered().find((c) => c.provider.info.live)?.provider.info ?? this.mock.info;
   }
 
   async complete(prompt: string, opts?: LLMCompleteOptions): Promise<string> {
-    for (const provider of this.candidates) {
+    for (const { provider } of this.ordered()) {
       if (!provider.info.live) continue;
       try {
         const out = await provider.complete(prompt, opts);

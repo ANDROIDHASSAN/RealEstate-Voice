@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { apify, getLLM, instagram, resend, stripe, twilio, video, whatsapp } from '@closeflow/integrations';
-import { getVoiceProvider } from '@closeflow/voice';
+import { getVoiceProvider, resetVoiceProvider } from '@closeflow/voice';
 import { logger } from '../logger.js';
 import { requireAuth } from '../middleware/auth.js';
 import { IntegrationSetting } from '../models.js';
@@ -21,11 +21,19 @@ interface ProviderField {
   label: string;
   secret: boolean;
 }
+/** A dropdown selection (provider / model choice) — stored as an env var. */
+interface ProviderOption {
+  var: string;
+  label: string;
+  choices: { value: string; label: string }[];
+  default: string;
+}
 interface ProviderDef {
   key: string;
   name: string;
   docsUrl: string;
   fields: ProviderField[];
+  options?: ProviderOption[];
 }
 
 export const PROVIDER_CATALOG: ProviderDef[] = [
@@ -56,11 +64,59 @@ export const PROVIDER_CATALOG: ProviderDef[] = [
   },
   {
     key: 'llm',
-    name: 'AI brain (Gemini / Groq)',
+    name: 'AI brain (Gemini / Groq / OpenAI)',
     docsUrl: 'https://aistudio.google.com/apikey',
     fields: [
       { var: 'GEMINI_API_KEY', label: 'Gemini API key', secret: true },
-      { var: 'GROQ_API_KEY', label: 'Groq API key (fallback)', secret: true },
+      { var: 'GROQ_API_KEY', label: 'Groq API key', secret: true },
+      { var: 'OPENAI_API_KEY', label: 'OpenAI API key', secret: true },
+    ],
+    options: [
+      {
+        var: 'LLM_PROVIDER',
+        label: 'Preferred provider',
+        default: 'auto',
+        choices: [
+          { value: 'auto', label: 'Auto (first available)' },
+          { value: 'gemini', label: 'Google Gemini' },
+          { value: 'groq', label: 'Groq' },
+          { value: 'openai', label: 'OpenAI' },
+        ],
+      },
+      {
+        var: 'GEMINI_MODEL',
+        label: 'Gemini model',
+        default: 'gemini-2.0-flash',
+        choices: [
+          { value: 'gemini-2.0-flash', label: 'gemini-2.0-flash' },
+          { value: 'gemini-2.0-flash-lite', label: 'gemini-2.0-flash-lite' },
+          { value: 'gemini-1.5-pro', label: 'gemini-1.5-pro' },
+          { value: 'gemini-1.5-flash', label: 'gemini-1.5-flash' },
+        ],
+      },
+      {
+        var: 'GROQ_MODEL',
+        label: 'Groq model',
+        default: 'llama-3.3-70b-versatile',
+        choices: [
+          { value: 'llama-3.3-70b-versatile', label: 'llama-3.3-70b-versatile' },
+          { value: 'llama-3.1-8b-instant', label: 'llama-3.1-8b-instant' },
+          { value: 'openai/gpt-oss-120b', label: 'gpt-oss-120b' },
+          { value: 'moonshotai/kimi-k2-instruct', label: 'kimi-k2-instruct' },
+        ],
+      },
+      {
+        var: 'OPENAI_MODEL',
+        label: 'OpenAI model',
+        default: 'gpt-4o-mini',
+        choices: [
+          { value: 'gpt-4o-mini', label: 'gpt-4o-mini' },
+          { value: 'gpt-4o', label: 'gpt-4o' },
+          { value: 'gpt-4.1', label: 'gpt-4.1' },
+          { value: 'gpt-4.1-mini', label: 'gpt-4.1-mini' },
+          { value: 'o4-mini', label: 'o4-mini' },
+        ],
+      },
     ],
   },
   {
@@ -89,6 +145,17 @@ export const PROVIDER_CATALOG: ProviderDef[] = [
       { var: 'CREATOMATE_API_KEY', label: 'Creatomate key', secret: true },
       { var: 'HIGGSFIELD_API_KEY', label: 'Higgsfield key', secret: true },
     ],
+    options: [
+      {
+        var: 'VIDEO_PROVIDER',
+        label: 'Render engine',
+        default: 'creatomate',
+        choices: [
+          { value: 'creatomate', label: 'Creatomate' },
+          { value: 'higgsfield', label: 'Higgsfield' },
+        ],
+      },
+    ],
   },
   {
     key: 'voice',
@@ -98,11 +165,76 @@ export const PROVIDER_CATALOG: ProviderDef[] = [
       { var: 'VAPI_API_KEY', label: 'Vapi API key', secret: true },
       { var: 'DOGRAH_BASE_URL', label: 'Dograh self-hosted URL', secret: false },
       { var: 'DOGRAH_API_KEY', label: 'Dograh API key', secret: true },
+      { var: 'VOICE_TTS_VOICE', label: 'Voice ID (TTS voice)', secret: false },
+    ],
+    options: [
+      {
+        var: 'VOICE_PROVIDER',
+        label: 'Call provider',
+        default: 'mock',
+        choices: [
+          { value: 'mock', label: 'Mock (simulated calls)' },
+          { value: 'vapi', label: 'Vapi' },
+          { value: 'dograh', label: 'Dograh (self-hosted)' },
+          { value: 'gemini-live', label: 'Gemini Live' },
+        ],
+      },
+      {
+        var: 'VOICE_TTS_PROVIDER',
+        label: 'Text-to-speech (voice)',
+        default: '11labs',
+        choices: [
+          { value: '11labs', label: 'ElevenLabs' },
+          { value: 'openai', label: 'OpenAI TTS' },
+          { value: 'cartesia', label: 'Cartesia' },
+          { value: 'playht', label: 'PlayHT' },
+          { value: 'azure', label: 'Azure' },
+        ],
+      },
+      {
+        var: 'VOICE_STT_PROVIDER',
+        label: 'Speech-to-text (transcriber)',
+        default: 'deepgram',
+        choices: [
+          { value: 'deepgram', label: 'Deepgram' },
+          { value: 'openai', label: 'OpenAI Whisper' },
+          { value: 'assembly', label: 'AssemblyAI' },
+          { value: 'gladia', label: 'Gladia' },
+        ],
+      },
+      {
+        var: 'VOICE_LLM_PROVIDER',
+        label: 'In-call brain (provider)',
+        default: 'groq',
+        choices: [
+          { value: 'groq', label: 'Groq' },
+          { value: 'openai', label: 'OpenAI' },
+          { value: 'anthropic', label: 'Anthropic' },
+          { value: 'google', label: 'Google' },
+        ],
+      },
+      {
+        var: 'VOICE_LLM_MODEL',
+        label: 'In-call brain (model)',
+        default: 'llama-3.3-70b-versatile',
+        choices: [
+          { value: 'llama-3.3-70b-versatile', label: 'llama-3.3-70b-versatile' },
+          { value: 'gpt-4o', label: 'gpt-4o' },
+          { value: 'gpt-4o-mini', label: 'gpt-4o-mini' },
+          { value: 'claude-3-5-sonnet', label: 'claude-3-5-sonnet' },
+        ],
+      },
     ],
   },
 ];
 
-const ALLOWED_VARS = new Set(PROVIDER_CATALOG.flatMap((p) => p.fields.map((f) => f.var)));
+const ALLOWED_VARS = new Set(
+  PROVIDER_CATALOG.flatMap((p) => [...p.fields.map((f) => f.var), ...(p.options ?? []).map((o) => o.var)]),
+);
+/** Option vars are constrained to their declared choices (defence-in-depth). */
+const OPTION_CHOICES = new Map(
+  PROVIDER_CATALOG.flatMap((p) => (p.options ?? []).map((o) => [o.var, new Set(o.choices.map((c) => c.value))] as const)),
+);
 
 function providerInfo(key: string) {
   switch (key) {
@@ -150,6 +282,11 @@ integrationsRouter.get('/', async (req: Request, res: Response) => {
             maskedValue: stored ? mask(stored) : envSet ? '(from .env)' : '',
           };
         }),
+        options: (p.options ?? []).map((o) => ({
+          ...o,
+          // Current selection: saved → env → default (never a secret, safe to return).
+          value: values[o.var] || process.env[o.var]?.replace(/\s+#.*$/, '').trim() || o.default,
+        })),
       };
     }),
   });
@@ -167,8 +304,14 @@ integrationsRouter.put('/:provider', async (req: Request, res: Response) => {
   const parsed = saveSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'invalid_input' });
 
+  const belongsToProvider = (k: string) =>
+    def.fields.some((f) => f.var === k) || (def.options ?? []).some((o) => o.var === k);
+  const withinChoices = (k: string, v: string) => {
+    const choices = OPTION_CHOICES.get(k);
+    return !choices || choices.has(v);
+  };
   const entries = Object.entries(parsed.data.values).filter(
-    ([k, v]) => ALLOWED_VARS.has(k) && def.fields.some((f) => f.var === k) && v.trim().length > 0,
+    ([k, v]) => ALLOWED_VARS.has(k) && belongsToProvider(k) && v.trim().length > 0 && withinChoices(k, v.trim()),
   );
   if (!entries.length) return res.status(400).json({ error: 'no_valid_keys' });
 
@@ -178,6 +321,9 @@ integrationsRouter.put('/:provider', async (req: Request, res: Response) => {
     { new: true, upsert: true },
   );
   for (const [k, v] of entries) process.env[k] = v.trim();
+  // Voice provider is cached as a singleton — rebuild it so the new selection
+  // (provider / TTS / STT) takes effect without a restart.
+  if (def.key === 'voice') resetVoiceProvider();
   logger.info({ provider: def.key, vars: entries.map(([k]) => k) }, 'integration keys saved from UI');
   return res.json({ ok: true, status: providerInfo(def.key), saved: entries.map(([k]) => k), updatedAt: doc.updatedAt });
 });

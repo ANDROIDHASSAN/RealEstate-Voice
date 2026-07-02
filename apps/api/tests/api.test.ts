@@ -235,6 +235,39 @@ describe('integration key management', () => {
     delete process.env.APIFY_TOKEN; // don't leak into later tests
   });
 
+  it('lists selectable model/provider dropdowns with current values', async () => {
+    const res = await request(app).get('/integrations').set('Authorization', `Bearer ${tokenA}`);
+    const llm = res.body.providers.find((p: { key: string }) => p.key === 'llm');
+    const pref = llm.options.find((o: { var: string }) => o.var === 'LLM_PROVIDER');
+    expect(pref.value).toBe('auto'); // default
+    expect(pref.choices.map((c: { value: string }) => c.value)).toEqual(expect.arrayContaining(['gemini', 'groq', 'openai']));
+    const voice = res.body.providers.find((p: { key: string }) => p.key === 'voice');
+    expect(voice.options.some((o: { var: string }) => o.var === 'VOICE_TTS_PROVIDER')).toBe(true);
+  });
+
+  it('saves a model selection and reflects it back', async () => {
+    const res = await request(app)
+      .put('/integrations/llm')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ values: { LLM_PROVIDER: 'openai', OPENAI_MODEL: 'gpt-4o' } });
+    expect(res.status).toBe(200);
+    const list = await request(app).get('/integrations').set('Authorization', `Bearer ${tokenA}`);
+    const llm = list.body.providers.find((p: { key: string }) => p.key === 'llm');
+    expect(llm.options.find((o: { var: string }) => o.var === 'LLM_PROVIDER').value).toBe('openai');
+    expect(llm.options.find((o: { var: string }) => o.var === 'OPENAI_MODEL').value).toBe('gpt-4o');
+    // reset so provider preference doesn't leak into other tests
+    delete process.env.LLM_PROVIDER;
+    delete process.env.OPENAI_MODEL;
+  });
+
+  it('rejects a dropdown value outside its declared choices', async () => {
+    const res = await request(app)
+      .put('/integrations/llm')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ values: { LLM_PROVIDER: 'skynet' } });
+    expect(res.status).toBe(400);
+  });
+
   it('rejects unknown providers and env vars outside the catalog', async () => {
     const bad = await request(app)
       .put('/integrations/nope')

@@ -158,6 +158,24 @@ test.describe.serial('CloseFlow E2E', () => {
     await expect(page.getByText('wa_e2e_test_key_123456')).toHaveCount(0);
   });
 
+  test('settings: pick an LLM provider/model from a dropdown and it persists', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('#email', `gate${stamp}@test.io`);
+    await page.fill('#password', 'Passw0rd!123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/');
+    await page.goto('/settings');
+    const row = page.locator('li', { has: page.getByRole('button', { name: /AI brain/ }) }).first();
+    await row.getByRole('button', { name: /AI brain/ }).click();
+    // First dropdown is "Preferred provider" → OpenAI, auto-saves on change
+    await row.locator('select').first().selectOption('openai');
+    await page.waitForTimeout(600);
+    // Reopen the page — selection must survive a round-trip to the server
+    await page.reload();
+    await row.getByRole('button', { name: /AI brain/ }).click();
+    await expect(row.locator('select').first()).toHaveValue('openai');
+  });
+
   test('agents: live team page shows the crew and activity feed', async ({ page }) => {
     await page.goto('/login');
     await page.fill('#email', `gate${stamp}@test.io`);

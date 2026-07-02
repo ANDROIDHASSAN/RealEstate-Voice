@@ -22,12 +22,20 @@ interface ProviderField {
   maskedValue: string;
 }
 
+interface ProviderOption {
+  var: string;
+  label: string;
+  choices: { value: string; label: string }[];
+  value: string;
+}
+
 interface ProviderRow {
   key: string;
   name: string;
   docsUrl: string;
   status: { name: string; live: boolean; reason?: string };
   fields: ProviderField[];
+  options?: ProviderOption[];
 }
 
 interface ComplianceDoc {
@@ -45,7 +53,7 @@ function ProviderPanel({ provider }: { provider: ProviderRow }) {
   const [saved, setSaved] = useState(false);
 
   const save = useMutation({
-    mutationFn: () => api(`/integrations/${provider.key}`, { method: 'PUT', body: { values } }),
+    mutationFn: (payload: Record<string, string>) => api(`/integrations/${provider.key}`, { method: 'PUT', body: { values: payload } }),
     onSuccess: () => {
       setValues({});
       setSaved(true);
@@ -81,9 +89,26 @@ function ProviderPanel({ provider }: { provider: ProviderRow }) {
           className="space-y-3 border-t border-black/5 px-4 py-4"
           onSubmit={(e) => {
             e.preventDefault();
-            if (dirty) save.mutate();
+            if (dirty) save.mutate(values);
           }}
         >
+          {/* Provider / model dropdowns — auto-save on change */}
+          {(provider.options ?? []).map((o) => (
+            <div key={o.var}>
+              <Label>{o.label}</Label>
+              <Select
+                defaultValue={o.value}
+                disabled={save.isPending}
+                onChange={(e) => save.mutate({ [o.var]: e.target.value })}
+              >
+                {o.choices.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          ))}
           {provider.fields.map((f) => (
             <div key={f.var}>
               <Label className="flex items-center justify-between">
