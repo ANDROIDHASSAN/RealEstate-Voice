@@ -1,12 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, Plus, Search, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { BookOpen, Globe, Loader2, Plus, Search, Trash2, UploadCloud } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Card, CardDescription, CardTitle } from '../ui/card';
 import { Input, Label, Textarea } from '../ui/input';
 import { api } from '../../lib/api';
+import { useAuthStore } from '../../store/auth';
+
+const API_BASE = import.meta.env.VITE_API_URL ? String(import.meta.env.VITE_API_URL) : '/api';
+const ACCEPT = '.pdf,.docx,.txt,.md,.csv,.html,.htm,.json,.vtt';
 
 interface KbDoc { _id: string; title: string; chunkCount: number; embedded: boolean; createdAt: string }
 interface KbResponse {
@@ -21,11 +25,57 @@ export function KnowledgeBase() {
   const qc = useQueryClient();
   const kb = useQuery({ queryKey: ['knowledge'], queryFn: () => api<KbResponse>('/knowledge') });
 
+  const token = useAuthStore((s) => s.accessToken);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [prompt, setPrompt] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchChunk[] | null>(null);
+  const [url, setUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ['knowledge'] });
+    void qc.invalidateQueries({ queryKey: ['voice-studio'] });
+  };
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || !files.length) return;
+    setUploading(true);
+    setUploadErr(null);
+    try {
+      for (const file of Array.from(files)) {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(`${API_BASE}/knowledge/upload`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: fd,
+        });
+        if (!res.ok) {
+          const e = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(e.error ?? 'upload_failed');
+        }
+      }
+      refresh();
+    } catch (e) {
+      setUploadErr((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const importUrl = useMutation({
+    mutationFn: () => api('/knowledge/url', { method: 'POST', body: { url } }),
+    onSuccess: () => {
+      setUrl('');
+      refresh();
+    },
+  });
 
   const add = useMutation({
     mutationFn: () => api('/knowledge', { method: 'POST', body: { title, content } }),
@@ -70,6 +120,34 @@ export function KnowledgeBase() {
       <div className="grid gap-5 lg:grid-cols-2">
         {/* Add + list */}
         <div className="space-y-4">
+          {/* Upload documents (NotebookLM-style sources) */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); void handleFiles(e.dataTransfer.files); }}
+            className={`flex flex-col items-center rounded-2xl border-2 border-dashed p-5 text-center transition-colors ${dragOver ? 'border-ink bg-card-blue' : 'border-black/10 bg-surface'}`}
+          >
+            {uploading ? <Loader2 className="h-6 w-6 animate-spin text-ink-soft" /> : <UploadCloud className="h-6 w-6 text-ink-soft" />}
+            <p className="mt-2 text-sm font-medium">{t('kb.uploadTitle')}</p>
+            <p className="text-xs text-ink-soft">{t('kb.uploadFormats')}</p>
+            <input ref={fileInput} type="file" accept={ACCEPT} multiple className="hidden" onChange={(e) => void handleFiles(e.target.files)} />
+            <Button type="button" size="sm" variant="secondary" className="mt-3" onClick={() => fileInput.current?.click()} disabled={uploading}>
+              <UploadCloud className="h-4 w-4" /> {uploading ? t('kb.uploading') : t('kb.chooseFiles')}
+            </Button>
+            {uploadErr && <p className="mt-2 text-xs text-red-600">{t('kb.uploadFailed')}: {uploadErr}</p>}
+          </div>
+
+          {/* Import from a web page */}
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => { e.preventDefault(); if (url.trim()) importUrl.mutate(); }}
+          >
+            <Input type="url" placeholder={t('kb.urlPh')} value={url} onChange={(e) => setUrl(e.target.value)} />
+            <Button type="submit" size="md" variant="secondary" disabled={importUrl.isPending || !url.trim()} title={t('kb.importUrl')}>
+              <Globe className="h-4 w-4" />
+            </Button>
+          </form>
+
           <form
             className="space-y-2 rounded-2xl bg-surface p-4"
             onSubmit={(e) => {
@@ -77,6 +155,7 @@ export function KnowledgeBase() {
               if (title.trim() && content.trim()) add.mutate();
             }}
           >
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">{t('kb.orPaste')}</p>
             <Label>{t('kb.docTitle')}</Label>
             <Input placeholder={t('kb.docTitlePh')} value={title} onChange={(e) => setTitle(e.target.value)} />
             <Label className="mt-2">{t('kb.docContent')}</Label>

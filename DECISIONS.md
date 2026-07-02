@@ -114,3 +114,14 @@
     resolves the effective agent (preset ⊕ override) and passes the pipeline
     overrides through `VoiceCallRequest` to the provider. Catalog choices live in
     `voice-studio.ts` and are validated server-side.
+
+## 2026-07-02 — Knowledge base document upload (NotebookLM-style)
+
+41. **File upload + URL import for the knowledge base** (`POST /knowledge/upload`
+    multipart, `POST /knowledge/url`). Text is extracted (`apps/api/src/lib/extract.ts`)
+    from PDF (`pdf-parse`, imported at the lib subpath to skip its debug harness),
+    DOCX (`mammoth`), and any UTF-8/HTML text, then chunked + embedded through the
+    same RAG pipeline as pasted text. Uploads are in-memory (multer 2.x, 15MB cap),
+    text-only — raw files are never stored. Extracted text is capped at 60k chars
+    so one big PDF can't spawn hundreds of embedding calls. The web KB card has a
+    drag-and-drop zone, a file picker, and a URL importer alongside the paste form.

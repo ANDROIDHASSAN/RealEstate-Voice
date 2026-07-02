@@ -218,6 +218,30 @@ describe('knowledge base (RAG)', () => {
     expect(res.body.chunks[0].text.toLowerCase()).toContain('first-time');
   });
 
+  it('uploads a text document (multipart) and ingests it', async () => {
+    const res = await request(app)
+      .post('/knowledge/upload')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .attach('file', Buffer.from('Our office is open Monday to Friday, 9am to 6pm, in Coral Gables.'), 'hours.txt');
+    expect(res.status).toBe(201);
+    expect(res.body.chunkCount).toBeGreaterThan(0);
+    const search = await request(app)
+      .post('/knowledge/search')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ query: 'when are you open?' });
+    expect(search.body.chunks.some((c: { text: string }) => /coral gables/i.test(c.text))).toBe(true);
+  });
+
+  it('rejects an upload with no file', async () => {
+    const res = await request(app).post('/knowledge/upload').set('Authorization', `Bearer ${tokenA}`);
+    expect(res.status).toBe(400);
+  });
+
+  it('validates the URL import input', async () => {
+    const res = await request(app).post('/knowledge/url').set('Authorization', `Bearer ${tokenA}`).send({ url: 'not-a-url' });
+    expect(res.status).toBe(400);
+  });
+
   it('saves the account-wide voice system prompt', async () => {
     const res = await request(app)
       .put('/knowledge/prompt')
