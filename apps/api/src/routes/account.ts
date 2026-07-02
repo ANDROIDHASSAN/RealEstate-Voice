@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { apify, getLLM, instagram, resend, stripe, twilio, video, whatsapp } from '@truecode/integrations';
 import { getVoiceProvider } from '@truecode/voice';
 import { z } from 'zod';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requirePermission } from '../middleware/auth.js';
 import { Account, Compliance, User } from '../models.js';
 import { publicAccount, publicUser } from './auth.js';
 
@@ -26,7 +26,7 @@ const updateSchema = z.object({
   ownerName: z.string().max(120).optional(),
 });
 
-accountRouter.patch('/me', async (req: Request, res: Response) => {
+accountRouter.patch('/me', requirePermission('account:manage'), async (req: Request, res: Response) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'invalid_input' });
   const account = await Account.findByIdAndUpdate(req.auth!.accountId, parsed.data, { new: true });
@@ -64,7 +64,7 @@ accountRouter.get('/compliance', async (req: Request, res: Response) => {
   res.json({ compliance: doc });
 });
 
-accountRouter.patch('/compliance', async (req: Request, res: Response) => {
+accountRouter.patch('/compliance', requirePermission('account:manage'), async (req: Request, res: Response) => {
   const parsed = complianceSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'invalid_input' });
   const { addDnc, removeDnc, ...rest } = parsed.data;

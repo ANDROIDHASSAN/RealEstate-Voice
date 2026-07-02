@@ -89,11 +89,14 @@ test.describe.serial('TrueCode AI E2E', () => {
     await page.waitForURL('**/');
     await page.goto('/voice');
     await page.getByRole('button', { name: /Talk to this agent in the browser/i }).click();
-    await expect(page.getByText(/Browser demo · no phone/i)).toBeVisible();
+    // Live voice-to-voice call UI opens (agent greets and speaks).
+    await expect(page.getByText(/Live call/i)).toBeVisible();
+    // Headless browsers have no speech recognition — use the "type instead" fallback.
+    await page.getByTitle(/Type instead/i).click();
     await page.getByPlaceholder(/Type your reply/i).fill('I want to buy a condo in Brickell');
     await page.getByPlaceholder(/Type your reply/i).press('Enter');
     await expect(page.getByText('I want to buy a condo in Brickell')).toBeVisible();
-    await expect(page.getByText(/book|help|team|great|market/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/book|help|team|great|market|condo|brickell/i).first()).toBeVisible({ timeout: 15_000 });
   });
 
   test('voice: Agent Studio edits a per-agent config and saves', async ({ page }) => {

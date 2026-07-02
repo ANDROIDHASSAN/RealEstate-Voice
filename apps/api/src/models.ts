@@ -7,7 +7,7 @@ const accountSchema = new Schema(
     phone: String,
     timezone: { type: String, default: 'America/New_York' },
     locale: { type: String, enum: ['en', 'es', 'ar', 'pt', 'ht'], default: 'en' },
-    plan: { type: String, enum: ['starter', 'pro', 'empire'], default: 'starter' },
+    plan: { type: String, enum: ['starter', 'pro', 'empire', 'ultimate'], default: 'starter' },
     enabledModules: { type: [String], default: ['core', 'instantReply', 'analytics'] },
     stripeCustomerId: String,
     stripeSubId: String,
@@ -20,7 +20,7 @@ const accountSchema = new Schema(
     whatsappPhoneId: String,
     websiteSlug: { type: String, index: true, sparse: true, unique: true },
     ownerName: String,
-    status: { type: String, enum: ['active', 'past_due', 'canceled'], default: 'active' },
+    status: { type: String, enum: ['active', 'past_due', 'canceled', 'suspended'], default: 'active' },
     /** Custom instructions injected into every voice agent's system prompt. */
     voiceSystemPrompt: String,
   },
@@ -33,7 +33,12 @@ const userSchema = new Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true, lowercase: true },
     passwordHash: { type: String, required: true },
-    role: { type: String, enum: ['owner', 'agent', 'admin'], default: 'owner' },
+    role: { type: String, enum: ['owner', 'admin', 'agent', 'viewer'], default: 'owner' },
+    /** Platform-level access — orthogonal to tenant role. */
+    platformRole: { type: String, enum: ['user', 'superadmin'], default: 'user', index: true },
+    status: { type: String, enum: ['active', 'suspended'], default: 'active' },
+    invitedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    lastLoginAt: Date,
     refreshTokens: { type: [String], default: [] },
   },
   { timestamps: true },
@@ -286,9 +291,251 @@ const integrationSettingSchema = new Schema(
 );
 integrationSettingSchema.index({ accountId: 1, provider: 1 }, { unique: true });
 
+/**
+ * Property Intelligence — a saved multi-agent investment analysis.
+ * `input` is the property the user submitted; `report` is the full orchestrated
+ * AnalysisReport (typed in @truecode/shared). Runs asynchronously through the
+ * property-analysis queue, mirroring the AgentRun lifecycle (running→done/error).
+ * `chat` holds the report-scoped AI assistant thread.
+ */
+const propertyAnalysisSchema = new Schema(
+  {
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    label: { type: String, required: true },
+    address: { type: String, required: true },
+    city: String,
+    state: String,
+    input: { type: Schema.Types.Mixed, required: true },
+    report: Schema.Types.Mixed,
+    investmentScore: { type: Number, default: 0 },
+    grade: String,
+    recommendation: String,
+    riskLevel: String,
+    status: { type: String, enum: ['running', 'done', 'error'], default: 'running', index: true },
+    error: String,
+    enriched: { type: Boolean, default: false },
+    watch: { type: Boolean, default: false },
+    chat: [{ role: { type: String, enum: ['user', 'assistant'] }, text: String, ts: { type: Date, default: Date.now }, _id: false }],
+  },
+  { timestamps: true },
+);
+propertyAnalysisSchema.index({ accountId: 1, createdAt: -1 });
+
+/**
+ * Quotations & Proposals — branded sales documents an owner sends to clients.
+ * Totals are always recomputed server-side (see @truecode/shared computeTotals);
+ * the stored `totals` is a cache for lists/PDF and is never trusted from input.
+ */
+const quoteSchema = new Schema(
+  {
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    number: { type: String, required: true },
+    title: { type: String, required: true },
+    client: {
+      name: { type: String, required: true },
+      email: String,
+      phone: String,
+      address: String,
+    },
+    propertyAddress: String,
+    leadId: { type: Schema.Types.ObjectId, ref: 'Lead' },
+    templateKey: String,
+    lineItems: [{ description: String, category: String, quantity: Number, unitPrice: Number, _id: false }],
+    currency: { type: String, default: 'USD' },
+    taxRatePct: { type: Number, default: 0 },
+    discountType: { type: String, enum: ['none', 'percent', 'amount'], default: 'none' },
+    discountValue: { type: Number, default: 0 },
+    totals: Schema.Types.Mixed,
+    notes: String,
+    terms: String,
+    validUntil: Date,
+    status: {
+      type: String,
+      enum: ['draft', 'sent', 'viewed', 'accepted', 'declined', 'expired'],
+      default: 'draft',
+      index: true,
+    },
+    sentAt: Date,
+    viewedAt: Date,
+    respondedAt: Date,
+    publicToken: { type: String, index: true, sparse: true },
+  },
+  { timestamps: true },
+);
+quoteSchema.index({ accountId: 1, createdAt: -1 });
+
+const clientSub = {
+  name: { type: String, required: true },
+  email: String,
+  phone: String,
+  address: String,
+};
+const lineItemSub = [{ description: String, category: String, quantity: Number, unitPrice: Number, _id: false }];
+
+/** Invoicing & Payments — money owed by a client, with a payment ledger. */
+const invoiceSchema = new Schema(
+  {
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    number: { type: String, required: true },
+    title: { type: String, required: true },
+    client: clientSub,
+    propertyAddress: String,
+    quoteId: { type: Schema.Types.ObjectId, ref: 'Quote' },
+    dealId: { type: Schema.Types.ObjectId, ref: 'Deal' },
+    lineItems: lineItemSub,
+    currency: { type: String, default: 'USD' },
+    taxRatePct: { type: Number, default: 0 },
+    discountType: { type: String, enum: ['none', 'percent', 'amount'], default: 'none' },
+    discountValue: { type: Number, default: 0 },
+    totals: Schema.Types.Mixed,
+    payments: [{ amount: Number, method: String, note: String, ts: { type: Date, default: Date.now }, _id: false }],
+    amountPaid: { type: Number, default: 0 },
+    balance: { type: Number, default: 0 },
+    notes: String,
+    dueDate: Date,
+    status: { type: String, enum: ['draft', 'sent', 'paid', 'partial', 'overdue', 'void'], default: 'draft', index: true },
+    sentAt: Date,
+    paidAt: Date,
+    publicToken: { type: String, index: true, sparse: true },
+  },
+  { timestamps: true },
+);
+invoiceSchema.index({ accountId: 1, createdAt: -1 });
+
+/** Deal Pipeline — a transaction moving through stages, with tasks. */
+const dealSchema = new Schema(
+  {
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    title: { type: String, required: true },
+    clientName: { type: String, required: true },
+    propertyAddress: String,
+    side: { type: String, enum: ['buyer', 'seller', 'both'], default: 'buyer' },
+    stage: {
+      type: String,
+      enum: ['lead', 'appointment', 'offer', 'under-contract', 'closing', 'closed-won', 'closed-lost'],
+      default: 'lead',
+      index: true,
+    },
+    value: { type: Number, default: 0 },
+    commissionPct: { type: Number, default: 3 },
+    expectedCloseDate: Date,
+    leadId: { type: Schema.Types.ObjectId, ref: 'Lead' },
+    notes: String,
+    tasks: [{ title: String, done: { type: Boolean, default: false }, dueDate: Date, _id: false }],
+    closedAt: Date,
+  },
+  { timestamps: true },
+);
+dealSchema.index({ accountId: 1, stage: 1 });
+
+/** Commission & Expense Ledger — income/expense book for the business. */
+const ledgerEntrySchema = new Schema(
+  {
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
+    type: { type: String, enum: ['income', 'expense'], required: true },
+    category: { type: String, required: true },
+    description: String,
+    amount: { type: Number, required: true },
+    date: { type: Date, required: true },
+    dealId: { type: Schema.Types.ObjectId, ref: 'Deal' },
+  },
+  { timestamps: true },
+);
+ledgerEntrySchema.index({ accountId: 1, date: -1 });
+
+/** Documents & E-sign — an agreement/disclosure a client accepts + signs. */
+const documentRecordSchema = new Schema(
+  {
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    number: { type: String, required: true },
+    title: { type: String, required: true },
+    templateKey: String,
+    client: { name: { type: String, required: true }, email: String },
+    propertyAddress: String,
+    body: { type: String, required: true },
+    dealId: { type: Schema.Types.ObjectId, ref: 'Deal' },
+    leadId: { type: Schema.Types.ObjectId, ref: 'Lead' },
+    status: { type: String, enum: ['draft', 'sent', 'viewed', 'signed', 'declined'], default: 'draft', index: true },
+    signature: { name: String, signedAt: Date, ip: String },
+    sentAt: Date,
+    publicToken: { type: String, index: true, sparse: true },
+  },
+  { timestamps: true },
+);
+documentRecordSchema.index({ accountId: 1, createdAt: -1 });
+
+/** CMS — per-account website settings (brand, theme, nav, SEO). One per account. */
+const siteConfigSchema = new Schema(
+  {
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, unique: true, index: true },
+    brandName: String,
+    tagline: String,
+    logoUrl: String,
+    theme: {
+      primaryColor: String,
+      accentColor: String,
+      bgColor: String,
+      font: { type: String, enum: ['sans', 'serif'], default: 'sans' },
+    },
+    contact: { phone: String, email: String, address: String },
+    social: { facebook: String, instagram: String, linkedin: String, youtube: String, x: String },
+    seo: { metaTitle: String, metaDescription: String, ogImage: String, noindex: Boolean },
+    nav: [{ label: String, href: String, _id: false }],
+    footerText: String,
+    published: { type: Boolean, default: false },
+  },
+  { timestamps: true },
+);
+
+// A block sub-schema is required because a subdocument field named `type`
+// would otherwise be interpreted by Mongoose as a SchemaType declaration
+// (turning `blocks` into `[String]`). An explicit Schema forces path semantics.
+const cmsBlockSchema = new Schema(
+  { id: String, type: String, data: Schema.Types.Mixed },
+  { _id: false },
+);
+
+/** CMS — a page or blog post built from content blocks. */
+const cmsContentSchema = new Schema(
+  {
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    type: { type: String, enum: ['page', 'post'], default: 'page', index: true },
+    title: { type: String, required: true },
+    slug: { type: String, required: true },
+    status: { type: String, enum: ['draft', 'published'], default: 'draft', index: true },
+    excerpt: String,
+    coverImageUrl: String,
+    blocks: [cmsBlockSchema],
+    seo: { metaTitle: String, metaDescription: String, ogImage: String, noindex: Boolean },
+    tags: { type: [String], default: [] },
+    showInNav: { type: Boolean, default: false },
+    navOrder: { type: Number, default: 0 },
+    isHome: { type: Boolean, default: false },
+    views: { type: Number, default: 0 },
+    publishedAt: Date,
+  },
+  { timestamps: true },
+);
+cmsContentSchema.index({ accountId: 1, type: 1, slug: 1 }, { unique: true });
+cmsContentSchema.index({ accountId: 1, updatedAt: -1 });
+
 function model<T extends Schema>(name: string, schema: T): Model<InferSchemaType<T>> {
   return (mongoose.models[name] as Model<InferSchemaType<T>>) ?? mongoose.model(name, schema);
 }
+export const PropertyAnalysis = model('PropertyAnalysis', propertyAnalysisSchema);
+export const SiteConfig = model('SiteConfig', siteConfigSchema);
+export const CmsContent = model('CmsContent', cmsContentSchema);
+export const Quote = model('Quote', quoteSchema);
+export const Invoice = model('Invoice', invoiceSchema);
+export const Deal = model('Deal', dealSchema);
+export const LedgerEntry = model('LedgerEntry', ledgerEntrySchema);
+export const DocumentRecord = model('DocumentRecord', documentRecordSchema);
 
 export const Account = model('Account', accountSchema);
 export const User = model('User', userSchema);

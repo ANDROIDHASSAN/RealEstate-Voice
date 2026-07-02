@@ -4,7 +4,7 @@ import { stripe } from '@truecode/integrations';
 import { PLANS, modulesForPlan, subscribeSchema, type PlanKey } from '@truecode/shared';
 import { env } from '../env.js';
 import { logger } from '../logger.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requirePermission } from '../middleware/auth.js';
 import { Account, UsageLedger } from '../models.js';
 import { publicAccount } from './auth.js';
 
@@ -14,7 +14,7 @@ billingRouter.get('/plans', (_req: Request, res: Response) => {
   res.json({ plans: Object.values(PLANS) });
 });
 
-billingRouter.post('/subscribe', requireAuth, async (req: Request, res: Response) => {
+billingRouter.post('/subscribe', requireAuth, requirePermission('account:billing'), async (req: Request, res: Response) => {
   const parsed = subscribeSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'invalid_input' });
   const plan = parsed.data.plan as PlanKey;

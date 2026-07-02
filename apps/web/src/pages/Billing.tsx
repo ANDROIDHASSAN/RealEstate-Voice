@@ -8,7 +8,7 @@ import { Card, CardTitle } from '../components/ui/card';
 import { PageSkeleton } from '../components/ui/skeleton';
 import { ErrorState } from '../components/ui/states';
 import { api } from '../lib/api';
-import { useAuthStore, type SessionAccount } from '../store/auth';
+import { useAuthStore, userCan, type SessionAccount } from '../store/auth';
 
 interface Plan {
   key: string;
@@ -29,14 +29,23 @@ const MODULE_LABELS: Record<string, string> = {
   website: 'Website / IDX',
   content: 'Content & video studio',
   multiAgent: 'Multi-agent AI team',
+  propertyIntel: 'Property Intelligence',
+  quotations: 'Quotations & proposals',
+  invoicing: 'Invoicing & payments',
+  deals: 'Deal pipeline',
+  ledger: 'Commission & expense ledger',
+  documents: 'Documents & e-sign',
+  cms: 'Website CMS',
 };
 
 const tones = ['pink', 'yellow', 'green'] as const;
+const planTone = (key: string, i: number) => (key === 'ultimate' ? 'purple' : tones[i % 3]);
 
 export default function Billing() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const { account, setAccount } = useAuthStore();
+  const { account, user, setAccount } = useAuthStore();
+  const canBill = userCan(user, 'account:billing');
 
   const plans = useQuery({ queryKey: ['plans'], queryFn: () => api<{ plans: Plan[] }>('/billing/plans') });
   const usage = useQuery({ queryKey: ['usage'], queryFn: () => api<{ usage: { type: string; total: number }[] }>('/billing/usage') });
@@ -64,19 +73,20 @@ export default function Billing() {
     <div className="space-y-6">
       <PageHeader title={t('billing.title')} subtitle={t('billing.subtitle')} />
       <p className="rounded-2xl bg-card-yellow px-5 py-3 text-sm">{t('billing.mockNote')}</p>
+      {!canBill && <p className="rounded-2xl bg-card-pink px-5 py-3 text-sm">{t('billing.noPermission')}</p>}
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {(plans.data?.plans ?? []).map((plan, i) => {
           const current = account?.plan === plan.key;
           return (
-            <Card key={plan.key} tone={tones[i % 3]} className="flex flex-col">
+            <Card key={plan.key} tone={planTone(plan.key, i)} className="flex flex-col">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">{plan.name}</CardTitle>
-                {current && <Badge tone="ink">{t('billing.current')}</Badge>}
+                {current ? <Badge tone="ink">{t('billing.current')}</Badge> : plan.key === 'ultimate' ? <Badge tone="ink">★ {t('billing.everything')}</Badge> : null}
               </div>
               <p className="mt-3 text-4xl font-semibold">
                 ${plan.priceMonthly}
-                <span className="text-base font-normal text-ink-soft">/mo{plan.key === 'empire' ? '+' : ''}</span>
+                <span className="text-base font-normal text-ink-soft">/mo{plan.key === 'empire' || plan.key === 'ultimate' ? '+' : ''}</span>
               </p>
               <ul className="mt-5 flex-1 space-y-2.5">
                 {plan.modules.map((m) => (
@@ -91,7 +101,7 @@ export default function Billing() {
               <Button
                 className="mt-6 w-full"
                 variant={current ? 'secondary' : 'primary'}
-                disabled={current || subscribe.isPending}
+                disabled={current || subscribe.isPending || !canBill}
                 onClick={() => subscribe.mutate(plan.key)}
               >
                 {current ? '✓' : t('billing.subscribe')}

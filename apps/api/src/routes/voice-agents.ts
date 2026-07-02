@@ -115,11 +115,7 @@ voiceAgentsRouter.post('/:key/demo', async (req: Request, res: Response) => {
 
   // Opening line: if the conversation is empty, the agent speaks first.
   if (history.length === 0) {
-    const first = (agent.firstMessage || 'Hi, thanks for taking my call!')
-      .replace(/\{\{account\.name\}\}/g, account?.name ?? 'our team')
-      .replace(/\{\{account\.ownerName\}\}/g, account?.ownerName ?? account?.name ?? 'your agent')
-      .replace(/\{\{lead\.firstName\}\}/g, 'there');
-    return res.json({ reply: first, grounded: false });
+    return res.json({ reply: fillDemoMerge(agent.firstMessage || 'Hi, thanks for taking my call!', account), grounded: false });
   }
 
   const lastUser = [...history].reverse().find((m) => m.role === 'user')?.text ?? '';
@@ -150,6 +146,23 @@ voiceAgentsRouter.post('/:key/demo', async (req: Request, res: Response) => {
 
   return res.json({ reply: reply || demoFallback(lastUser, knowledge, agent.name), grounded: Boolean(knowledge), llm: llm.info });
 });
+
+/**
+ * Fill merge tokens with sample values for the browser demo (there is no real
+ * lead), then strip any remaining {{…}} so the caller never hears "{{lead.x}}".
+ */
+function fillDemoMerge(text: string, account: { name?: string | null; ownerName?: string | null } | null): string {
+  return text
+    .replace(/\{\{account\.name\}\}/g, account?.name ?? 'our team')
+    .replace(/\{\{account\.ownerName\}\}/g, account?.ownerName ?? account?.name ?? 'your agent')
+    .replace(/\{\{lead\.firstName\}\}/g, 'there')
+    .replace(/\{\{lead\.propertyInterest\}\}/g, 'the property you were looking at')
+    .replace(/\{\{lead\.location\}\}/g, 'your area')
+    .replace(/\{\{lead\.budget\}\}/g, 'your budget')
+    .replace(/\{\{\s*[\w.]+\s*\}\}/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
 
 /** Keyless demo reply — cites KB when available, else a helpful holding line. */
 function demoFallback(userText: string, knowledge: string, name: string): string {

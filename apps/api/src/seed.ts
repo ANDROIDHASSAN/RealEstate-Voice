@@ -4,16 +4,24 @@
  */
 import './env.js';
 import bcrypt from 'bcryptjs';
-import { modulesForPlan } from '@truecode/shared';
+import { computeTotals, docTemplate, modulesForPlan, orchestrate, quoteTemplate, type PropertyInput } from '@truecode/shared';
 import { connectDb, disconnectDb } from './db.js';
 import {
   Account,
   Appointment,
   Call,
+  CmsContent,
   Compliance,
   Conversation,
+  Deal,
+  DocumentRecord,
+  Invoice,
   Lead,
+  LedgerEntry,
+  PropertyAnalysis,
+  Quote,
   Sequence,
+  SiteConfig,
   User,
 } from './models.js';
 
@@ -150,6 +158,166 @@ export async function seedDemo(): Promise<{ accountId: string }> {
       { delayHours: 24, channel: 'sms', template: 'Hi {{lead.firstName}}, did you get a chance to look at the listings? Any favorites?' },
       { delayHours: 72, channel: 'email', template: 'Hi {{lead.firstName}}, here is this week\'s market update for {{interest}}. — {{account.ownerName}}' },
     ],
+  });
+
+  // Property Intelligence — a few pre-computed investment reports (deterministic
+  // engine, no external calls) so the module is populated on first login.
+  const sampleProperties: PropertyInput[] = [
+    { address: '742 Brickell Bay Dr', city: 'Miami', state: 'FL', zip: '33131', propertyType: 'condo', askingPrice: 525_000, bedrooms: 2, bathrooms: 2, sqft: 1180, yearBuilt: 2016, estimatedRentMonthly: 3600, hoaMonthly: 650 },
+    { address: '1820 Alton Rd', city: 'Miami Beach', state: 'FL', zip: '33139', propertyType: 'single-family', askingPrice: 890_000, bedrooms: 4, bathrooms: 3, sqft: 2450, yearBuilt: 1998 },
+    { address: '355 NW 24th St', city: 'Wynwood', state: 'FL', zip: '33127', propertyType: 'multi-family', askingPrice: 415_000, bedrooms: 4, bathrooms: 4, sqft: 2100, yearBuilt: 1975, repairCost: 60_000, arv: 620_000 },
+  ];
+  for (const input of sampleProperties) {
+    const report = orchestrate(input);
+    await PropertyAnalysis.create({
+      accountId: account._id,
+      label: `${input.address}, ${input.city}`,
+      address: input.address,
+      city: input.city,
+      state: input.state,
+      input,
+      report,
+      investmentScore: report.investmentScore,
+      grade: report.grade,
+      recommendation: report.recommendation,
+      riskLevel: report.risk.level,
+      status: 'done',
+      enriched: false,
+    });
+  }
+
+  // Quotations — a couple of branded proposals in different states.
+  const year = new Date().getUTCFullYear();
+  const premium = quoteTemplate('listing-premium')!;
+  const buyerRep = quoteTemplate('buyer-rep')!;
+  const quoteSeed = [
+    { tpl: premium, num: 1, title: 'Premium Listing Proposal — Coral Gables', client: { name: 'Sarah Klein', email: 'sarah.k@example.com', phone: '+13055551002' }, propertyAddress: 'Coral Gables, FL', taxRatePct: 7, status: 'accepted' as const },
+    { tpl: buyerRep, num: 2, title: 'Buyer Representation — Brickell', client: { name: 'Carlos Mendez', email: 'carlos@example.com', phone: '+13055551001' }, propertyAddress: 'Brickell, FL', taxRatePct: 0, status: 'sent' as const },
+    { tpl: premium, num: 3, title: 'Listing Proposal — Miami Beach', client: { name: 'Jennifer Wu', email: 'jwu@example.com' }, propertyAddress: 'Miami Beach, FL', taxRatePct: 7, status: 'draft' as const },
+  ];
+  for (const q of quoteSeed) {
+    const totals = computeTotals(q.tpl.lineItems, { taxRatePct: q.taxRatePct });
+    await Quote.create({
+      accountId: account._id,
+      number: `QT-${year}-${String(q.num).padStart(4, '0')}`,
+      title: q.title,
+      client: q.client,
+      propertyAddress: q.propertyAddress,
+      templateKey: q.tpl.key,
+      lineItems: q.tpl.lineItems,
+      currency: 'USD',
+      taxRatePct: q.taxRatePct,
+      discountType: 'none',
+      discountValue: 0,
+      totals,
+      terms: q.tpl.terms,
+      validUntil: new Date(Date.now() + 30 * 24 * 3600 * 1000),
+      status: q.status,
+      sentAt: q.status !== 'draft' ? new Date() : undefined,
+      respondedAt: q.status === 'accepted' ? new Date() : undefined,
+    });
+  }
+
+  // Team members (RBAC demo) + a platform super admin.
+  await User.create({
+    accountId: account._id, name: 'Jordan Lee', email: 'admin@truecode.ai',
+    passwordHash: await bcrypt.hash('Demo1234!', 12), role: 'admin',
+  });
+  await User.create({
+    accountId: account._id, name: 'Sam Rivera', email: 'agent@truecode.ai',
+    passwordHash: await bcrypt.hash('Demo1234!', 12), role: 'agent',
+  });
+  await User.create({
+    accountId: account._id, name: 'Riley Viewer', email: 'viewer@truecode.ai',
+    passwordHash: await bcrypt.hash('Demo1234!', 12), role: 'viewer',
+  });
+  // Platform operator — sees the cross-tenant /admin surface. (super@truecode.ai / Super1234!)
+  await User.create({
+    accountId: account._id, name: 'Platform Admin', email: 'super@truecode.ai',
+    passwordHash: await bcrypt.hash('Super1234!', 12), role: 'admin', platformRole: 'superadmin',
+  });
+
+  // A couple of extra tenants so the super-admin dashboard has a portfolio.
+  const extraTenants = [
+    { name: 'Sunset Realty Group', email: 'owner@sunsetrealty.example', plan: 'pro' as const, owner: 'Priya Anand' },
+    { name: 'Downtown Property Partners', email: 'owner@downtownpp.example', plan: 'starter' as const, owner: 'Marcus Bell' },
+  ];
+  for (const tn of extraTenants) {
+    if (await User.findOne({ email: tn.email })) continue;
+    const acc = await Account.create({ name: tn.name, email: tn.email, plan: tn.plan, enabledModules: modulesForPlan(tn.plan), ownerName: tn.owner });
+    await Compliance.create({ accountId: acc._id });
+    await User.create({ accountId: acc._id, name: tn.owner, email: tn.email, passwordHash: await bcrypt.hash('Demo1234!', 12), role: 'owner' });
+    await Lead.create([
+      { accountId: acc._id, firstName: 'Sample', lastName: 'Buyer', phone: '+13055559001', source: 'website', status: 'new', intent: 'buyer' },
+      { accountId: acc._id, firstName: 'Sample', lastName: 'Seller', phone: '+13055559002', source: 'zillow', status: 'contacted', intent: 'seller' },
+    ]);
+  }
+
+  // Deal pipeline — a few transactions across stages.
+  await Deal.create([
+    { accountId: account._id, title: 'Brickell condo — Carlos', clientName: 'Carlos Mendez', propertyAddress: 'Brickell, FL', side: 'buyer', stage: 'under-contract', value: 520000, commissionPct: 3, tasks: [{ title: 'Order inspection', done: true }, { title: 'Appraisal', done: false }] },
+    { accountId: account._id, title: 'Coral Gables listing — Klein', clientName: 'Sarah Klein', propertyAddress: 'Coral Gables, FL', side: 'seller', stage: 'closing', value: 890000, commissionPct: 2.5, tasks: [{ title: 'Final walkthrough', done: false }] },
+    { accountId: account._id, title: 'North Miami — Baptiste', clientName: 'Marc Baptiste', propertyAddress: 'North Miami, FL', side: 'buyer', stage: 'closed-won', value: 305000, commissionPct: 3, closedAt: new Date() },
+    { accountId: account._id, title: 'Wynwood rental — Diego', clientName: 'Diego Fernandez', propertyAddress: 'Wynwood, FL', side: 'buyer', stage: 'offer', value: 415000, commissionPct: 3 },
+  ]);
+
+  // Ledger — recent income + expenses.
+  const ymd = (m: number, d: number) => new Date(Date.UTC(2026, m, d));
+  await LedgerEntry.create([
+    { accountId: account._id, type: 'income', category: 'commission', description: 'North Miami closing', amount: 9150, date: ymd(5, 12) },
+    { accountId: account._id, type: 'income', category: 'referral', description: 'Lender referral', amount: 500, date: ymd(5, 20) },
+    { accountId: account._id, type: 'expense', category: 'marketing', description: 'Instagram ads', amount: 800, date: ymd(5, 3) },
+    { accountId: account._id, type: 'expense', category: 'staging', description: 'Coral Gables staging', amount: 1200, date: ymd(4, 28) },
+    { accountId: account._id, type: 'expense', category: 'software', description: 'CRM + tools', amount: 297, date: ymd(5, 1) },
+  ]);
+
+  // Invoice — one sent, partially paid.
+  const invItems = [{ description: 'Premium listing package', category: 'Marketing', quantity: 1, unitPrice: 2025 }];
+  const invTotals = computeTotals(invItems, { taxRatePct: 7 });
+  await Invoice.create({
+    accountId: account._id, number: `INV-${year}-0001`, title: 'Listing Services — Coral Gables',
+    client: { name: 'Sarah Klein', email: 'sarah.k@example.com' }, propertyAddress: 'Coral Gables, FL',
+    lineItems: invItems, currency: 'USD', taxRatePct: 7, totals: invTotals,
+    payments: [{ amount: 1000, method: 'card', ts: new Date() }], amountPaid: 1000, balance: Math.round((invTotals.total - 1000) * 100) / 100,
+    status: 'partial', sentAt: new Date(), dueDate: new Date(Date.now() + 14 * 24 * 3600 * 1000),
+  });
+
+  // Document — a listing agreement out for signature.
+  const la = docTemplate('listing-agreement')!;
+  await DocumentRecord.create({
+    accountId: account._id, number: `DOC-${year}-0001`, title: 'Exclusive Listing Agreement — Coral Gables',
+    templateKey: la.key, client: { name: 'Sarah Klein', email: 'sarah.k@example.com' }, propertyAddress: 'Coral Gables, FL',
+    body: la.body.replace(/\{\{brokerage\}\}/g, account.name).replace(/\{\{client\}\}/g, 'Sarah Klein').replace(/\{\{property\}\}/g, 'Coral Gables, FL').replace(/\{\{commission\}\}/g, '2.5'),
+    status: 'sent', sentAt: new Date(),
+  });
+
+  // CMS — a published website with settings, a home page and a blog post.
+  await SiteConfig.create({
+    accountId: account._id,
+    brandName: 'Miami Luxe Realty',
+    tagline: 'Luxury waterfront living, expertly guided.',
+    theme: { primaryColor: '#111111', accentColor: '#1F9D6B', bgColor: '#FBF8F4', font: 'sans' },
+    contact: { phone: '+13055550100', email: 'hello@miamiluxe.example', address: 'Brickell, Miami, FL' },
+    social: { instagram: 'https://instagram.com/miamiluxe', facebook: 'https://facebook.com/miamiluxe' },
+    seo: { metaTitle: 'Miami Luxe Realty — Luxury Homes', metaDescription: 'Find your dream waterfront home in Miami.' },
+    footerText: '© Miami Luxe Realty. All rights reserved.',
+    published: true,
+  });
+  await CmsContent.create({
+    accountId: account._id, type: 'page', title: 'Home', slug: 'home', status: 'published', isHome: true, showInNav: true, publishedAt: new Date(),
+    blocks: [
+      { id: 'h1', type: 'hero', data: { heading: 'Find your dream home in Miami', subheading: 'Luxury listings and white-glove service from Alexandra Reyes.', ctaLabel: 'Book a consultation', ctaHref: '#contact', align: 'center' } },
+      { id: 's1', type: 'stats', data: { items: '$250M | Sold in 2025\n120+ | Families helped\n18 yrs | Local expertise' } },
+      { id: 'f1', type: 'features', data: { heading: 'Why work with us', items: 'Fast closings | We close in under 30 days on average\nOff-market access | Exclusive listings you won\'t find elsewhere\nData-driven pricing | AI-powered valuations on every home' } },
+      { id: 't1', type: 'testimonial', data: { quote: 'Alexandra found us the perfect Brickell condo in two weeks.', author: 'Carlos M.', role: 'Buyer · Brickell' } },
+      { id: 'c1', type: 'contact', data: { heading: 'Ready to move?', note: 'Tell us what you\'re looking for and we\'ll be in touch today.' } },
+    ],
+  });
+  await CmsContent.create({
+    accountId: account._id, type: 'post', title: '5 tips for first-time buyers in Miami', slug: '5-tips-first-time-buyers',
+    status: 'published', publishedAt: new Date(), excerpt: 'Everything you need to know before buying your first home in Miami.',
+    tags: ['buyers', 'guide'],
+    blocks: [{ id: 'b1', type: 'richtext', data: { heading: 'Start with pre-approval', body: 'Getting pre-approved tells you exactly what you can afford and makes your offer stronger.\n\nWork with a local lender who understands the Miami market.' } }],
   });
 
   return { accountId: String(account._id) };

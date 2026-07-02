@@ -5,3 +5,8 @@ export * from './voice-agents.js';
 export * from './crew-agents.js';
 export * from './lead-personas.js';
 export * from './voice-studio.js';
+export * from './property-intel.js';
+export * from './quotations.js';
+export * from './owner-suite.js';
+export * from './rbac.js';
+export * from './cms.js';

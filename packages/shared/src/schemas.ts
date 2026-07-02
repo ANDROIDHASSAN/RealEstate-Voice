@@ -156,7 +156,7 @@ export const orchestrateSchema = z.object({
 });
 
 export const subscribeSchema = z.object({
-  plan: z.enum(['starter', 'pro', 'empire']),
+  plan: z.enum(['starter', 'pro', 'empire', 'ultimate']),
 });
 
 export { SUPPORTED_LOCALES };

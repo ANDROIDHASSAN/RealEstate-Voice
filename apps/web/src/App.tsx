@@ -16,6 +16,17 @@ const Inbox = lazy(() => import('./pages/Inbox'));
 const LeadEngine = lazy(() => import('./pages/LeadEngine'));
 const Content = lazy(() => import('./pages/Content'));
 const Agents = lazy(() => import('./pages/Agents'));
+const PropertyIntelligence = lazy(() => import('./pages/PropertyIntelligence'));
+const Quotations = lazy(() => import('./pages/Quotations'));
+const Invoicing = lazy(() => import('./pages/Invoicing'));
+const Deals = lazy(() => import('./pages/Deals'));
+const Ledger = lazy(() => import('./pages/Ledger'));
+const Documents = lazy(() => import('./pages/Documents'));
+const Team = lazy(() => import('./pages/Team'));
+const Admin = lazy(() => import('./pages/Admin'));
+const Cms = lazy(() => import('./pages/Cms'));
+const PublicCms = lazy(() => import('./pages/PublicCms'));
+const PublicPortal = lazy(() => import('./pages/PublicPortal'));
 const Website = lazy(() => import('./pages/Website'));
 const Billing = lazy(() => import('./pages/Billing'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -31,6 +42,12 @@ function Protected({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function SuperAdminOnly({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore((s) => s.user);
+  if (user?.platformRole !== 'superadmin') return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -40,6 +57,9 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/site/:slug" element={<PublicSite />} />
+            <Route path="/portal/:kind/:token" element={<PublicPortal />} />
+            <Route path="/read/:slug" element={<PublicCms />} />
+            <Route path="/read/:slug/:contentSlug" element={<PublicCms />} />
             <Route
               element={
                 <Protected>
@@ -55,7 +75,16 @@ export default function App() {
               <Route path="/lead-engine" element={<ModuleGate module="leadEngine"><LeadEngine /></ModuleGate>} />
               <Route path="/content" element={<ModuleGate module="content"><Content /></ModuleGate>} />
               <Route path="/agents" element={<ModuleGate module="multiAgent"><Agents /></ModuleGate>} />
+              <Route path="/property-intelligence" element={<ModuleGate module="propertyIntel"><PropertyIntelligence /></ModuleGate>} />
+              <Route path="/quotations" element={<ModuleGate module="quotations"><Quotations /></ModuleGate>} />
+              <Route path="/invoicing" element={<ModuleGate module="invoicing"><Invoicing /></ModuleGate>} />
+              <Route path="/deals" element={<ModuleGate module="deals"><Deals /></ModuleGate>} />
+              <Route path="/ledger" element={<ModuleGate module="ledger"><Ledger /></ModuleGate>} />
+              <Route path="/documents" element={<ModuleGate module="documents"><Documents /></ModuleGate>} />
+              <Route path="/cms" element={<ModuleGate module="cms"><Cms /></ModuleGate>} />
               <Route path="/website" element={<ModuleGate module="website"><Website /></ModuleGate>} />
+              <Route path="/team" element={<Team />} />
+              <Route path="/admin" element={<SuperAdminOnly><Admin /></SuperAdminOnly>} />
               <Route path="/billing" element={<Billing />} />
               <Route path="/settings" element={<Settings />} />
             </Route>

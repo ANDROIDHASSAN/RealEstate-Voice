@@ -66,7 +66,7 @@ authRouter.post('/signup', authLimiter, async (req: Request, res: Response) => {
     role: 'owner',
   });
 
-  const ctx: AuthContext = { userId: String(user._id), accountId: String(account._id), role: 'owner' };
+  const ctx: AuthContext = { userId: String(user._id), accountId: String(account._id), role: 'owner', platformRole: 'user' };
   const accessToken = await issueTokens(res, ctx);
   return res.status(201).json({ accessToken, user: publicUser(user), account: publicAccount(account.toObject()) });
 });
@@ -77,11 +77,20 @@ authRouter.post('/login', authLimiter, async (req: Request, res: Response) => {
   const user = await User.findOne({ email: parsed.data.email });
   if (!user || !(await bcrypt.compare(parsed.data.password, user.passwordHash)))
     return res.status(401).json({ error: 'invalid_credentials' });
+  if (user.status === 'suspended') return res.status(403).json({ error: 'user_suspended' });
 
   const account = await Account.findById(user.accountId);
-  if (!account || account.status === 'canceled') return res.status(403).json({ error: 'account_inactive' });
+  if (!account || account.status === 'canceled' || account.status === 'suspended')
+    return res.status(403).json({ error: 'account_inactive' });
 
-  const ctx: AuthContext = { userId: String(user._id), accountId: String(user.accountId), role: user.role };
+  user.lastLoginAt = new Date();
+  await user.save();
+  const ctx: AuthContext = {
+    userId: String(user._id),
+    accountId: String(user.accountId),
+    role: user.role,
+    platformRole: user.platformRole ?? 'user',
+  };
   const accessToken = await issueTokens(res, ctx);
   return res.json({ accessToken, user: publicUser(user), account: publicAccount(account.toObject()) });
 });
@@ -92,14 +101,16 @@ authRouter.post('/refresh', async (req: Request, res: Response) => {
   try {
     const ctx = verifyRefreshToken(token);
     const user = await User.findById(ctx.userId);
-    if (!user) return res.status(401).json({ error: 'unauthorized' });
+    if (!user || user.status === 'suspended') return res.status(401).json({ error: 'unauthorized' });
     // Rotation: verify this refresh token is one we issued, then replace it.
     const matches = await Promise.all(user.refreshTokens.map((h) => bcrypt.compare(token.slice(-64), h)));
     const idx = matches.findIndex(Boolean);
     if (idx === -1) return res.status(401).json({ error: 'refresh_revoked' });
     user.refreshTokens.splice(idx, 1);
     await user.save();
-    const accessToken = await issueTokens(res, ctx);
+    // Re-read role/platformRole so role changes take effect on refresh.
+    const fresh: AuthContext = { ...ctx, role: user.role, platformRole: user.platformRole ?? 'user' };
+    const accessToken = await issueTokens(res, fresh);
     return res.json({ accessToken });
   } catch {
     return res.status(401).json({ error: 'invalid_refresh_token' });
@@ -125,8 +136,22 @@ authRouter.post('/logout', requireAuth, async (req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
-export function publicUser(user: { _id: unknown; accountId: unknown; name: string; email: string; role: string }) {
-  return { _id: String(user._id), accountId: String(user.accountId), name: user.name, email: user.email, role: user.role };
+export function publicUser(user: {
+  _id: unknown;
+  accountId: unknown;
+  name: string;
+  email: string;
+  role: string;
+  platformRole?: string;
+}) {
+  return {
+    _id: String(user._id),
+    accountId: String(user.accountId),
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    platformRole: user.platformRole ?? 'user',
+  };
 }
 
 export function publicAccount(account: Record<string, unknown>) {

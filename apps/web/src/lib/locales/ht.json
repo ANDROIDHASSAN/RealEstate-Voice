@@ -9,6 +9,15 @@
     "content": "Estidyo kontni",
     "agents": "Ekip IA",
     "website": "Sit entènèt",
+    "cms": "CMS Sit la",
+    "propertyIntel": "Entèlijans Pwopriyete",
+    "quotations": "Devi",
+    "invoicing": "Fakti",
+    "deals": "Kontra",
+    "ledger": "Rejis",
+    "documents": "Dokiman",
+    "team": "Ekip",
+    "admin": "Admin",
     "billing": "Faktirasyon",
     "settings": "Paramèt",
     "logout": "Dekonekte"
@@ -265,7 +274,14 @@
     "keys": {
       "title": "Konekte kont ou yo",
       "body": "Nan Paramèt, kole kle API pou Twilio, WhatsApp ak plis ankò. Poko gen kle? Tout bagay toujou mache an mòd tès san danje pou ou ka eksplore."
-    }
+    },
+    "language": {
+      "title": "Pale nenpòt lang",
+      "body": "Chanje tout tablo a ant anglè, panyòl, arab, pòtigè ak kreyòl ayisyen isit la — nenpòt lè."
+    },
+    "mute": "Fèmen naratè a",
+    "unmute": "Ouvè naratè a",
+    "back": "Tounen"
   },
   "auth": {
     "login": "Konekte",

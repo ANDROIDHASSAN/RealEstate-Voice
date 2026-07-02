@@ -96,12 +96,30 @@ export function useSpeech(onFinalTranscript: (text: string) => void): {
   return { supported: supported && available, listening, interim, start, stop };
 }
 
-/** Speak a reply aloud in the dashboard language (used when voice mode is on). */
-export function speak(text: string, locale: string): void {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text.trim()) return;
+/**
+ * Speak a reply aloud in the dashboard language. `onEnd` fires when speech
+ * finishes (or immediately if TTS is unavailable / muted) — used to drive the
+ * hands-free call loop (agent speaks → then we listen).
+ */
+export function speak(text: string, locale: string, onEnd?: () => void): void {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text.trim()) {
+    onEnd?.();
+    return;
+  }
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = SPEECH_LANG[locale] ?? 'en-US';
-  utterance.rate = 1.05;
+  utterance.rate = 1.02;
+  let done = false;
+  const finish = () => { if (!done) { done = true; onEnd?.(); } };
+  utterance.onend = finish;
+  utterance.onerror = finish;
   window.speechSynthesis.speak(utterance);
+  // Safety net: some browsers drop onend — estimate by length (~14 chars/sec).
+  window.setTimeout(finish, Math.min(30_000, 1200 + text.length * 75));
+}
+
+/** Stop any in-progress speech immediately. */
+export function stopSpeaking(): void {
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
 }

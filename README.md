@@ -5,8 +5,28 @@
 | Tier | $/mo | Unlocks |
 |---|---|---|
 | Starter | 297 | Core + Instant Reply |
-| Pro | 997 | + Voice + Follow-up + WhatsApp |
+| Pro | 997 | + Voice + Follow-up + WhatsApp + **Property Intelligence** + **Quotations** |
 | Empire | 1997+ | + Lead Engine + Website + Multi-agent + Content/Video |
+| **Ultimate** | 3997+ | **Everything** — every module, always (incl. Owner Suite, CMS, RBAC) |
+
+**Property Intelligence** turns any listing into a full investment report in under 60 seconds: 5 weighted AI specialist agents (comps · rental · neighborhood · strategy · market) → animated Investment Score, fair value, cash flow / cap rate / ROI, risk, opportunities, a grounded report AI chat, and a branded print-to-PDF report. Pure deterministic engine in `packages/shared` (works with zero keys); LLM enriches the narrative only.
+
+**Quotations & Proposals** — build a branded quote from a real-estate template (listing package, buyer representation, closing estimate, commission proposal), track it draft → sent → accepted, and export a print-to-PDF. Server-authoritative totals, a built-in commission calculator, pipeline stats. `/quotations`.
+
+**Owner Suite** — the back office a real-estate business runs on:
+- **Invoicing & Payments** (`/invoicing`) — invoice clients (or convert an accepted quote), record payments to paid, branded PDF, shareable client link.
+- **Deal Pipeline** (`/deals`) — Kanban from lead → closed across 7 stages, weighted pipeline value + commission forecasting.
+- **Commission & Expense Ledger** (`/ledger`) — income/expense book with a monthly P&L chart.
+- **Documents & E-sign** (`/documents`) — listing agreements, buyer-rep, disclosures; clients sign online.
+- **Client Portal** (`/portal/:kind/:token`) — public, no-login pages where clients view and **accept quotes** or **e-sign documents**.
+- **Client CMA** — a jargon-free comparative-market-analysis one-pager exported from any Property Intelligence report.
+
+**RBAC & Super Admin** — proper multi-tenant access control:
+- **Roles** (owner / admin / agent / viewer) with a permission model; `viewer` is read-only everywhere, `agent` can edit data but not billing/team, only `owner` touches owner/admin roles and the last owner can't be removed.
+- **Team page** (`/team`) — invite members, assign roles, suspend/remove.
+- **Super Admin** (`/admin`, platform-role gated) — cross-tenant dashboard: KPIs & est. MRR, change any tenant's plan/status, suspend, delete, and **impersonate** ("view as tenant"). Demo operator: `super@truecode.ai` / `Super1234!`.
+
+**Website CMS** (`/cms`) — a self-service, block-based site builder. Edit **everything**: brand, logo, theme colors/font, contact, social, SEO, navigation and footer; build **pages** and a **blog** from blocks (hero, features, gallery, stats, testimonial, CTA, contact form, HTML embed…) with a live preview, draft/publish workflow and per-page SEO. Public site renders at `/read/:siteSlug` — the demo site is live at `/read/miami-luxe`.
 
 ## Quick start
 ```bash

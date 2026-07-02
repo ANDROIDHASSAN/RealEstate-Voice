@@ -17,7 +17,7 @@ eventsRouter.get('/stream', (req: Request, res: Response) => {
   let auth: AuthContext;
   try {
     const p = jwt.verify(token, env.jwtSecret) as AuthContext & Record<string, unknown>;
-    auth = { userId: p.userId, accountId: p.accountId, role: p.role };
+    auth = { userId: p.userId, accountId: p.accountId, role: p.role, platformRole: p.platformRole ?? 'user' };
   } catch {
     res.status(401).json({ error: 'unauthorized' });
     return;

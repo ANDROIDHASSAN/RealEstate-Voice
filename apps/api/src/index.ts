@@ -9,6 +9,7 @@ import { registerContentWorkers } from './workers/content.js';
 import { registerDripWorker } from './workers/drip.js';
 import { registerInstantReplyWorker } from './workers/instant-reply.js';
 import { registerLeadEngineWorkers } from './workers/lead-engine.js';
+import { registerPropertyAnalysisWorker } from './workers/property-analysis.js';
 import { registerVoiceCallWorker } from './workers/voice-call.js';
 
 async function main(): Promise<void> {
@@ -32,6 +33,7 @@ async function main(): Promise<void> {
   registerDripWorker();
   registerLeadEngineWorkers();
   registerContentWorkers();
+  registerPropertyAnalysisWorker();
 
   const app = createApp();
   app.listen(env.port, () => {

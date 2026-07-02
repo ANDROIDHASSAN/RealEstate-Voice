@@ -10,10 +10,20 @@ export const MODULES = {
   website: 'website',
   content: 'content',
   multiAgent: 'multiAgent',
+  propertyIntel: 'propertyIntel',
+  quotations: 'quotations',
+  invoicing: 'invoicing',
+  deals: 'deals',
+  ledger: 'ledger',
+  documents: 'documents',
+  cms: 'cms',
   analytics: 'analytics',
 } as const;
 
 export type ModuleFlag = (typeof MODULES)[keyof typeof MODULES];
+
+/** Every module flag — future-proof source for the all-inclusive plan. */
+export const ALL_MODULES = Object.values(MODULES) as ModuleFlag[];
 
 export const PLANS = {
   starter: {
@@ -33,6 +43,13 @@ export const PLANS = {
       'voice',
       'followup',
       'whatsapp',
+      'propertyIntel',
+      'quotations',
+      'invoicing',
+      'deals',
+      'ledger',
+      'documents',
+      'cms',
     ] as ModuleFlag[],
   },
   empire: {
@@ -51,7 +68,24 @@ export const PLANS = {
       'website',
       'content',
       'multiAgent',
+      'propertyIntel',
+      'quotations',
+      'invoicing',
+      'deals',
+      'ledger',
+      'documents',
+      'cms',
     ] as ModuleFlag[],
+  },
+  /**
+   * All-inclusive tier — every module, always. Modules are derived from MODULES
+   * so any feature added later is automatically part of Ultimate.
+   */
+  ultimate: {
+    key: 'ultimate',
+    name: 'Ultimate',
+    priceMonthly: 3997,
+    modules: ALL_MODULES,
   },
 } as const;
 

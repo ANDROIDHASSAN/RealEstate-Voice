@@ -9,6 +9,15 @@
     "content": "Estudio de contenido",
     "agents": "Equipo IA",
     "website": "Sitio web",
+    "cms": "CMS del sitio",
+    "propertyIntel": "Inteligencia de Propiedades",
+    "quotations": "Cotizaciones",
+    "invoicing": "Facturas",
+    "deals": "Negocios",
+    "ledger": "Libro contable",
+    "documents": "Documentos",
+    "team": "Equipo",
+    "admin": "Admin",
     "billing": "Facturación",
     "settings": "Ajustes",
     "logout": "Cerrar sesión"
@@ -265,7 +274,14 @@
     "keys": {
       "title": "Conecta tus cuentas",
       "body": "En Ajustes, pega las claves API de Twilio, WhatsApp y más. ¿Aún sin claves? Todo funciona en modo de prueba seguro para que explores."
-    }
+    },
+    "language": {
+      "title": "Habla cualquier idioma",
+      "body": "Cambia todo el panel entre inglés, español, árabe, portugués y creole haitiano desde aquí — cuando quieras."
+    },
+    "mute": "Silenciar narración",
+    "unmute": "Activar narración",
+    "back": "Atrás"
   },
   "auth": {
     "login": "Iniciar sesión",

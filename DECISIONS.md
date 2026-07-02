@@ -125,3 +125,183 @@
     text-only — raw files are never stored. Extracted text is capped at 60k chars
     so one big PDF can't spawn hundreds of embedding calls. The web KB card has a
     drag-and-drop zone, a file picker, and a URL importer alongside the paste form.
+
+## 2026-07-02 — Property Intelligence (multi-agent investment analysis) — M11
+
+42. **New gated module `propertyIntel`** (Pro + Empire; `packages/shared/modules.ts`).
+    Turns any listing into a full investment report via 5 config-weighted specialist
+    agents: Comparable Sales (25%), Rental Income (20%), Neighborhood (20%),
+    Investment Strategy (20%), Market Trend (15%). The orchestrator produces a
+    weighted 0–100 Investment Score, letter grade + tier, recommendation
+    (Strong Buy / Buy / Hold / Negotiate / Wait / Avoid), fair-market value,
+    suggested-offer range, cash-flow/cap-rate/DSCR/ROI, risk score, opportunities,
+    a deal (flip) analysis, and a full SWOT + negotiation narrative.
+43. **The engine is a pure, deterministic, dependency-free module in
+    `@truecode/shared` (`property-intel.ts`)** — shared by web + api, unit-testable,
+    and re-run-stable. ALL financial numbers are real math (amortization, NOI, cap
+    rate, cash-on-cash, GRM, 5/10-yr ROI). Data with no external source (comps,
+    neighborhood, market) is a model *seeded from the address* via a mulberry32 PRNG,
+    so a property always scores identically — labelled "modeled estimate" in the
+    explainability layer, never presented as live MLS/records data. Honors the
+    mock-mode rule: works fully with zero API keys.
+44. **LLM enrichment is prose-only** (`apps/api/src/lib/property-agents.ts`): when an
+    LLM key is live it rewrites the narrative (executive summary, SWOT, negotiation
+    script) and never touches a number; deterministic narrative is the always-present
+    fallback. A report-scoped AI chat (`POST /property-analysis/:id/chat`) answers
+    grounded in the computed report, with intent-matched deterministic answers when
+    no key is set.
+45. **Async multi-agent run** mirrors the orchestrator/lead-engine pattern: `POST
+    /property-analysis` persists a `PropertyAnalysis` doc (running) + enqueues
+    `QUEUES.propertyAnalysis`; the worker emits a live `emitAgentEvent` per specialist,
+    computes + enriches, saves the report (done/error), and bills `aiTokens` usage.
+    The web page (`/property-intelligence`) polls until done and renders an animated
+    circular score (`ScoreRing`), Recharts radar/bar/area charts, comps table, risk
+    grid, opportunities, negotiation script, the grounded AI chat, and a zero-dep
+    branded print-to-PDF report (`lib/reportPdf.ts`). Seed adds 3 pre-computed demo
+    reports. Every query is `accountId`-scoped; tenant isolation + gating covered by
+    tests (49 passing).
+
+## 2026-07-02 — Quotations & Proposals — M12
+
+46. **New gated module `quotations`** (Pro + Empire). Owner-facing sales documents:
+    build a branded quote/proposal from a real-estate template (premium/standard
+    listing, buyer representation, seller closing-cost estimate, commission
+    proposal, or blank), send it, and track draft → sent → viewed → accepted /
+    declined / expired. Endpoints under `/quotations`: CRUD, `/templates`, `/stats`,
+    `/:id/send`, `/:id/status`, `/:id/duplicate`.
+47. **Money math is pure + server-authoritative** (`@truecode/shared/quotations.ts`):
+    `computeTotals` (subtotal → discount %/amount → tax → total) is recomputed on
+    every create/update — a tampered client `totals` is ignored (covered by a test).
+    Templates + currencies live in shared config. A `commissionBreakdown` helper
+    powers the on-page commission calculator (gross → agent split → brokerage cut →
+    net after transaction fee). Accepted quotes are locked from edits (409).
+48. **Web** (`/quotations`): pipeline stat cards + a status donut (Recharts), the
+    commission calculator, a live-totals **QuoteBuilder** (template picker, line-item
+    editor, currency/tax/discount), a read-only preview with lifecycle actions, and a
+    zero-dependency branded **print-to-PDF** (`lib/quotePdf.ts`). Nav + route + gate +
+    i18n (nav label in all 5 locales, full strings in en with fallback). Seed adds 3
+    demo quotes; tenant isolation + gating + tamper-resistance covered by tests
+    (58 passing total).
+
+## 2026-07-02 — Owner Suite: Invoicing, Deals, Ledger, Documents + Client Portal + CMA — M13
+
+49. **Four new gated modules** (Pro + Empire), each `accountId`-scoped, tested:
+    - `invoicing` — invoices with a payment ledger; `computeTotals` + `invoiceBalance`
+      (pure, server-authoritative) drive draft→sent→partial→paid; `from-quote/:id`
+      converts an accepted quote; per-invoice branded print-to-PDF (`invoicePdf.ts`).
+    - `deals` — Kanban pipeline over 7 real-estate stages with per-stage probability
+      (weighted pipeline value) and commission forecasting; `PATCH /:id/stage` moves.
+    - `ledger` — income/expense book; `summarizeLedger` returns totals, by-category,
+      and a monthly income-vs-expense series (Recharts P&L).
+    - `documents` — agreement/disclosure/addendum templates with `{{merge}}` fields;
+      e-signature lifecycle draft→sent→viewed→signed; signed docs lock.
+50. **Client / Owner Portal** — a PUBLIC, unauthenticated `/portal/:kind/:token`
+    router (mirrors the `/site/:slug` pattern). Quotes, invoices and documents each
+    mint an opaque `publicToken` on share/send; the token is the capability. Clients
+    view and **accept a quote** or **e-sign a document** with no login; only
+    whitelisted fields are returned, and actions emit account activity events. Web:
+    `PublicPortal.tsx` (branded, outside the auth shell).
+51. **CMA one-pager** — a client-facing Comparative Market Analysis PDF
+    (`downloadCmaPdf`) reuses the Property Intelligence engine (comps + fair value +
+    market) with no investor jargon — a "Client CMA" button on every report.
+52. All money math stays in `@truecode/shared` (`owner-suite.ts`); totals/balances
+    are recomputed server-side and never trusted from the client (tested). 11 new
+    tests cover totals, payments→paid, stage moves + commission, ledger summary,
+    doc e-sign via the public portal, quote accept via portal, quote→invoice
+    conversion, gating and tenant isolation. Full suite: **69 passing**. Seed
+    populates deals, ledger, an invoice and a listing agreement for the demo.
+
+## 2026-07-02 — Multi-tenant RBAC + Super Admin — M14
+
+53. **Two orthogonal access axes** (`@truecode/shared/rbac.ts`):
+    - **Tenant role** — owner / admin / agent / viewer, mapped to permissions
+      (`members:manage`, `account:manage`, `account:billing`, `data:write`,
+      `data:read`) via `ROLE_PERMISSIONS` + `can()`. `canManageRole` enforces that
+      only an owner may create/modify owner/admin members.
+    - **Platform role** — user / superadmin, independent of tenant role; only
+      unlocks the cross-tenant `/admin` surface. Both now live in the JWT
+      (`AuthContext` gained `platformRole`) and are re-read on refresh so role
+      changes take effect without re-login.
+54. **Enforcement middleware** (`middleware/auth.ts`): `requirePermission(perm)`,
+    `rbacWrite` (GET = read, any mutation needs `data:write` → makes `viewer`
+    read-only), and `requireSuperAdmin`. `rbacWrite` is mounted on every business
+    router (leads, quotations, invoicing, deals, ledger, documents,
+    property-analysis); `account:manage` gates account/compliance edits and
+    `account:billing` gates `/billing/subscribe`.
+55. **Team management** (`/members`, web `/team`): list, invite (returns a one-time
+    temp password — no email infra), change role, suspend/reactivate, remove. The
+    **last owner can never be demoted, suspended, or removed** (no lockout).
+    Everything is `accountId`-scoped.
+56. **Super admin** (`/admin`, web `/admin`, superadmin-only): platform KPIs
+    (tenants, users, est. MRR, suspended), a searchable tenant table, change a
+    tenant's plan/modules/status, **suspend** (blocks that tenant's logins),
+    **delete** (cascades across all that tenant's collections), and **impersonate**
+    — issues a tenant-scoped access token that deliberately DROPS superadmin (a
+    support session can't reach `/admin`); the operator's own session is stashed
+    client-side and restored via the "Exit" banner in the shell.
+57. Seed adds a super admin (**super@truecode.ai / Super1234!**), an admin/agent/
+    viewer member in the demo account, and two extra tenants so the admin
+    dashboard has a portfolio. 10 new tests cover role permissions, viewer
+    read-only, last-owner protection, member tenant-scoping, superadmin gating,
+    plan change, suspend-blocks-login, and impersonation scope. Full suite: **79
+    passing.**
+
+## 2026-07-02 — Website CMS (block-based, self-service) — M15
+
+58. **New gated module `cms`** (Pro + Empire) — a full, industry-grade website
+    content system per account. Everything the public site renders is editable:
+    **Site settings** (brand, logo, theme colors + font, contact, social, SEO,
+    navigation menu, footer, publish toggle), **Pages** and **Blog posts** built
+    from a block registry, with draft/published workflow, per-item SEO, cover
+    image, nav placement, and a "home page" flag.
+59. **Block registry drives everything** (`@truecode/shared/cms.ts`,
+    `BLOCK_TYPES`). Each block is `{ id, type, data }`; the registry describes each
+    type's editable fields (kind: text/textarea/url/lines/color/select). The web
+    editor renders that generically and the public renderer (`BlockView`) switches
+    on type — so a new block is one registry entry + one render case, no schema
+    churn. Blocks shipped: hero, rich text, image, gallery, features, stats,
+    testimonial, CTA, contact form (wired to the lead webhook), HTML embed,
+    divider. Mongoose gotcha noted: a subdoc field named `type` must use an
+    explicit sub-Schema (`cmsBlockSchema`) or it's parsed as a SchemaType.
+60. **Public renderer** — `/public-cms/:siteSlug` (index: config + nav + published
+    pages + posts + home) and `/public-cms/:siteSlug/content/:slug` (a published
+    page/post, increments views). Unauthenticated, published-only, keyed by the
+    account's `websiteSlug`. Web route `/read/:slug[/:contentSlug]`
+    (`PublicCms.tsx`) applies the theme and renders the block tree with a live
+    header/footer; the CMS admin (`/cms`) has tabbed Pages/Posts/Settings, a
+    live-preview block editor, and publish/duplicate/delete.
+61. Content is `accountId`-scoped and `rbacWrite`-guarded (viewers read-only).
+    Seed provisions the demo site (published, brand + theme, a home page with
+    hero/stats/features/testimonial/contact blocks, and a blog post) at
+    `/read/miami-luxe`. 10 new tests cover settings, auto/unique slugs, the block
+    registry, public rendering (published-only + view counts), publish/unpublish
+    visibility, module gating, tenant scoping and Zod validation. Full suite:
+    **89 passing.**
+
+## 2026-07-02 — Ultimate plan (all-inclusive) — M16
+
+62. **New top tier `ultimate`** ($3,997/mo+) — includes EVERY module. Its module
+    list is derived from `MODULES` via `ALL_MODULES = Object.values(MODULES)`, so
+    any module added in the future is automatically part of Ultimate (no drift).
+    Wired through the plan enum everywhere: Account model, `subscribeSchema`,
+    admin `PATCH /accounts` schema + dropdown, and the web session/plan types.
+    Billing grid now lays out 4 plans and flags Ultimate with a "★ Everything"
+    badge; the super-admin tenant table can assign it. A test asserts subscribing
+    to Ultimate enables every `MODULES` flag and unlocks previously empire-only
+    endpoints. Full suite: **90 passing.**
+
+## 2026-07-02 — Voice demo is now a live voice-to-voice call
+
+63. **Browser agent demo upgraded to a hands-free call.** `AgentDemo.tsx` is a
+    state machine (connecting → speaking → listening → thinking → loop): the agent
+    greets and speaks via `speechSynthesis`, then the mic opens automatically
+    (`SpeechRecognition`), your reply is transcribed + sent, and the agent speaks
+    back — no tapping between turns. `speak()` gained an `onEnd` callback (with a
+    length-based safety timeout for browsers that drop `onend`) to drive the loop,
+    plus `stopSpeaking()`. Call UI: animated state orb, live captions, timer,
+    mute-mic / speaker / hang-up controls, and a "type instead" fallback for
+    browsers without speech recognition (headless included).
+64. **Fixed raw merge tokens in the demo greeting** — `{{lead.propertyInterest}}`
+    (and other lead fields) now fill with sample demo values via `fillDemoMerge`,
+    which also strips any leftover `{{…}}` so a caller never hears a template.
+    E2E updated to drive the new call UI via the type-fallback. Suite: 90 passing.

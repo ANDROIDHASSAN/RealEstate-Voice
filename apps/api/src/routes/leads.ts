@@ -2,11 +2,11 @@ import { Router, type Request, type Response } from 'express';
 import { createLeadSchema } from '@truecode/shared';
 import { z } from 'zod';
 import { getQueue, QUEUES } from '../lib/queue.js';
-import { requireAuth, requireModule } from '../middleware/auth.js';
+import { rbacWrite, requireAuth, requireModule } from '../middleware/auth.js';
 import { Lead } from '../models.js';
 
 export const leadsRouter = Router();
-leadsRouter.use(requireAuth);
+leadsRouter.use(requireAuth, rbacWrite);
 
 const listQuery = z.object({
   status: z.string().optional(),

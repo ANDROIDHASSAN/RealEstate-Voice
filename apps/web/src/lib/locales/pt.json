@@ -9,6 +9,15 @@
     "content": "Estúdio de conteúdo",
     "agents": "Time de IA",
     "website": "Site",
+    "cms": "CMS do site",
+    "propertyIntel": "Inteligência de Imóveis",
+    "quotations": "Orçamentos",
+    "invoicing": "Faturas",
+    "deals": "Negócios",
+    "ledger": "Livro-razão",
+    "documents": "Documentos",
+    "team": "Equipe",
+    "admin": "Admin",
     "billing": "Cobrança",
     "settings": "Configurações",
     "logout": "Sair"
@@ -265,7 +274,14 @@
     "keys": {
       "title": "Conecte suas contas",
       "body": "Em Configurações, cole as chaves API do Twilio, WhatsApp e mais. Sem chaves ainda? Tudo funciona em modo de teste seguro para você explorar."
-    }
+    },
+    "language": {
+      "title": "Fale qualquer idioma",
+      "body": "Troque todo o painel entre inglês, espanhol, árabe, português e crioulo haitiano aqui — quando quiser."
+    },
+    "mute": "Silenciar narração",
+    "unmute": "Ativar narração",
+    "back": "Voltar"
   },
   "auth": {
     "login": "Entrar",

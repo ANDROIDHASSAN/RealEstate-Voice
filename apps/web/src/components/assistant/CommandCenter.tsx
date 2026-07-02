@@ -144,6 +144,7 @@ export function CommandCenter() {
         <button
           onClick={() => setOpen((v) => !v)}
           title={`${t('assistant.title')} (Alt+K)`}
+          data-tour="assistant"
           className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-on shadow-soft transition-transform hover:scale-105"
         >
           {open ? <X className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
