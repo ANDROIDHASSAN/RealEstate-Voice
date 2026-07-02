@@ -24,7 +24,11 @@ function setRefreshCookie(res: Response, token: string): void {
     secure: env.nodeEnv === 'production',
     sameSite: env.nodeEnv === 'production' ? 'none' : 'lax',
     maxAge: 30 * 24 * 3600 * 1000,
-    path: '/auth',
+    // Path '/' (not '/auth'): the web dev server proxies /api → API and strips
+    // the prefix, so refresh requests hit /api/auth/refresh in the browser. A
+    // '/auth' cookie path would never match that — sending it for all paths is
+    // the robust fix and keeps the session alive across the proxy.
+    path: '/',
   });
 }
 
@@ -117,7 +121,7 @@ authRouter.post('/seed-demo', async (_req: Request, res: Response) => {
 
 authRouter.post('/logout', requireAuth, async (req: Request, res: Response) => {
   await User.updateOne({ _id: req.auth!.userId }, { $set: { refreshTokens: [] } });
-  res.clearCookie(REFRESH_COOKIE, { path: '/auth' });
+  res.clearCookie(REFRESH_COOKIE, { path: '/' });
   res.json({ ok: true });
 });
 

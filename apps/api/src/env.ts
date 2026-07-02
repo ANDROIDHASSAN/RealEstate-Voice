@@ -37,6 +37,12 @@ export const env = {
   apiUrl: clean(process.env.API_URL) || 'http://localhost:4100',
   jwtSecret: clean(process.env.JWT_SECRET) || 'dev-only-secret-change-me',
   jwtRefreshSecret: clean(process.env.JWT_REFRESH_SECRET) || 'dev-only-refresh-change-me',
+  // Access-token lifetime. Short in production (refresh keeps sessions alive);
+  // long in local dev so you're never logged out mid-work. Override with
+  // ACCESS_TOKEN_TTL (e.g. "15m", "12h", "30d").
+  accessTtl:
+    clean(process.env.ACCESS_TOKEN_TTL) ||
+    (clean(process.env.NODE_ENV) === 'production' ? '15m' : '30d'),
   mongoUri: usableMongo,
   redisUrl: usableRedis,
   agentsServiceUrl: clean(process.env.AGENTS_SERVICE_URL),

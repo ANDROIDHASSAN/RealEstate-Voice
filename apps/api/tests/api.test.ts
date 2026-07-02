@@ -49,6 +49,21 @@ describe('auth & authz', () => {
     expect(res.status).toBe(401);
   });
 
+  it('keeps the session alive: login → refresh issues a new access token', async () => {
+    // A cookie-carrying agent mimics the browser; the refresh cookie (path "/")
+    // must come back on /auth/refresh so the session never silently expires.
+    const agent = request.agent(app);
+    const login = await agent.post('/auth/login').send({ email: 'a@test.io', password: 'Passw0rd!123' });
+    expect(login.status).toBe(200);
+    expect(login.headers['set-cookie']?.some((c: string) => c.startsWith('cf_refresh='))).toBe(true);
+    const refreshed = await agent.post('/auth/refresh').send();
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.body.accessToken).toBeTruthy();
+    // The new access token authenticates a protected route
+    const me = await request(app).get('/account/me').set('Authorization', `Bearer ${refreshed.body.accessToken}`);
+    expect(me.status).toBe(200);
+  });
+
   it('requires auth on protected routes', async () => {
     expect((await request(app).get('/leads')).status).toBe(401);
     expect((await request(app).get('/account/me')).status).toBe(401);

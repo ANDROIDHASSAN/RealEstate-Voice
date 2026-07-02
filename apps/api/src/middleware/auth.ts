@@ -17,7 +17,7 @@ declare module 'express-serve-static-core' {
 }
 
 export function signAccessToken(ctx: AuthContext): string {
-  return jwt.sign(ctx, env.jwtSecret, { expiresIn: '15m' });
+  return jwt.sign(ctx, env.jwtSecret, { expiresIn: env.accessTtl as jwt.SignOptions['expiresIn'] });
 }
 
 export function signRefreshToken(ctx: AuthContext): string {
