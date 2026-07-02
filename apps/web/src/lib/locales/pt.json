@@ -44,6 +44,8 @@
   "voice": {
     "title": "Agentes de voz",
     "subtitle": "Seu time de ligações multilíngue 24/7",
+    "engine": "Motor de voz",
+    "engineHint": "Escolha o cérebro de IA e a voz que seus agentes usam nas ligações — as mudanças valem para novas ligações na hora.",
     "live": "Ativo",
     "ready": "Pronto",
     "recentCalls": "Ligações recentes",

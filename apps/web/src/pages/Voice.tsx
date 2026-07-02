@@ -1,15 +1,86 @@
-import { useQuery } from '@tanstack/react-query';
-import { Phone, PhoneCall } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Cpu, Phone, PhoneCall, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Badge } from '../components/ui/badge';
 import { Card, CardDescription, CardTitle } from '../components/ui/card';
+import { Label, Select } from '../components/ui/input';
 import { PageSkeleton } from '../components/ui/skeleton';
 import { EmptyState, ErrorState } from '../components/ui/states';
 import { api } from '../lib/api';
 import { timeAgo } from '../lib/utils';
+
+interface ProviderOption {
+  var: string;
+  label: string;
+  choices: { value: string; label: string }[];
+  value: string;
+}
+interface IntegrationsResponse {
+  providers: { key: string; status: { name: string; live: boolean; reason?: string }; options?: ProviderOption[] }[];
+}
+
+// Which voice-pipeline dropdowns to surface right here on the Voice page.
+const VOICE_ENGINE_VARS = ['VOICE_LLM_PROVIDER', 'VOICE_LLM_MODEL', 'VOICE_TTS_PROVIDER'];
+
+/** In-call AI brain + voice selectors — writes through /integrations/voice. */
+function VoiceEngineCard() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const integrations = useQuery({
+    queryKey: ['integrations'],
+    queryFn: () => api<IntegrationsResponse>('/integrations'),
+  });
+  const save = useMutation({
+    mutationFn: (values: Record<string, string>) => api('/integrations/voice', { method: 'PUT', body: { values } }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['integrations'] }),
+  });
+
+  const voice = integrations.data?.providers.find((p) => p.key === 'voice');
+  const options = (voice?.options ?? []).filter((o) => VOICE_ENGINE_VARS.includes(o.var));
+
+  return (
+    <Card tone="blue">
+      <div className="mb-1 flex items-center gap-2">
+        <Cpu className="h-5 w-5" />
+        <CardTitle>{t('voice.engine')}</CardTitle>
+        {voice && (
+          <Badge tone={voice.status.live ? 'green' : 'yellow'} className="ms-auto">
+            {voice.status.live ? voice.status.name : t('settings.needsKey')}
+          </Badge>
+        )}
+      </div>
+      <CardDescription className="mb-4">{t('voice.engineHint')}</CardDescription>
+      {integrations.isLoading ? (
+        <p className="text-sm text-ink-soft">{t('common.loading')}</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-3">
+          {options.map((o) => (
+            <div key={o.var}>
+              <Label className="flex items-center gap-1.5">
+                {o.var === 'VOICE_LLM_PROVIDER' && <Sparkles className="h-3.5 w-3.5" />}
+                {o.label}
+              </Label>
+              <Select
+                defaultValue={o.value}
+                disabled={save.isPending}
+                onChange={(e) => save.mutate({ [o.var]: e.target.value })}
+              >
+                {o.choices.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
 
 interface AgentCfg {
   key: string;
@@ -57,6 +128,8 @@ export default function Voice() {
   return (
     <div className="space-y-6">
       <PageHeader title={t('voice.title')} subtitle={t('voice.subtitle')} />
+
+      <VoiceEngineCard />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">

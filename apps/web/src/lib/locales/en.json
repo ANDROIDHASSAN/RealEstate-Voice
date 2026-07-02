@@ -44,6 +44,8 @@
   "voice": {
     "title": "Voice Agents",
     "subtitle": "Your 24/7 multilingual calling team",
+    "engine": "Voice engine",
+    "engineHint": "Pick the AI brain and voice your agents use on calls — changes apply to new calls instantly.",
     "live": "Live",
     "ready": "Ready",
     "recentCalls": "Recent calls",

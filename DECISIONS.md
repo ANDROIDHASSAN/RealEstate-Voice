@@ -51,3 +51,25 @@
     in-call brain (`VOICE_LLM_PROVIDER`/`VOICE_LLM_MODEL`) are read by the Vapi
     adapter instead of being hardcoded. Saving voice settings calls
     `resetVoiceProvider()` so the cached singleton rebuilds without a restart.
+
+## 2026-07-02 — Local DB persistence, boot auto-seed, voice-page LLM selector
+
+31. **Local dev DB now persists to disk.** When falling back to the bundled
+    mongod (no/again-malformed MONGO_URI) AND not in a mock/test run, data is
+    written to `.local-data/mongo` (gitignored) so a restart keeps your login,
+    session and data — fixing the "logged out / demo gone every time" symptom.
+    A stale `mongod.lock` from a hard `tsx watch` reload is cleared on start.
+    Tests / acceptance / e2e (FORCE_MOCK_PROVIDERS=1) stay non-persistent and
+    isolated (`shouldPersistLocalDb()` gates on it).
+32. **Demo account auto-seeds on boot** (idempotent `seedDemo()`; opt out with
+    AUTO_SEED_DEMO=0) so a fresh or reset local DB always has a working login
+    (demo@closeflow.io / Demo1234!). Unit tests never run `main()`, so they're
+    unaffected.
+33. **Background dev servers started from the assistant end with its session.**
+    That is a harness limitation, not the app — to keep the app up across
+    sessions, run `npm run dev` in your own terminal. Persistence (#31) means a
+    restart there loses nothing.
+34. **Voice page has an in-call LLM/voice selector** (`voice.engine` card) that
+    reads/writes the same `/integrations/voice` options (VOICE_LLM_PROVIDER,
+    VOICE_LLM_MODEL, VOICE_TTS_PROVIDER) as Settings — so the model can be
+    picked right where calls are configured.

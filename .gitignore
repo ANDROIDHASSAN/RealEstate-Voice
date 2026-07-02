@@ -12,6 +12,7 @@ test-results/
 dashboard*.png
 chart.png
 .mongodb-binaries/
+.local-data/
 __pycache__/
 .venv/
 .DS_Store

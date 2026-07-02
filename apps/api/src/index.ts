@@ -4,6 +4,7 @@ import { connectDb } from './db.js';
 import { env } from './env.js';
 import { logger } from './logger.js';
 import { applyStoredIntegrationKeys } from './routes/integrations.js';
+import { seedDemo } from './seed.js';
 import { registerContentWorkers } from './workers/content.js';
 import { registerDripWorker } from './workers/drip.js';
 import { registerInstantReplyWorker } from './workers/instant-reply.js';
@@ -13,6 +14,18 @@ import { registerVoiceCallWorker } from './workers/voice-call.js';
 async function main(): Promise<void> {
   await connectDb();
   await applyStoredIntegrationKeys();
+
+  // Auto-seed the demo account on boot so a fresh/restarted local DB always has
+  // a working login (demo@closeflow.io / Demo1234!). Idempotent; opt out with
+  // AUTO_SEED_DEMO=0. Skipped for unit tests (they never run main()).
+  if (process.env.AUTO_SEED_DEMO !== '0') {
+    try {
+      const { accountId } = await seedDemo();
+      logger.info({ accountId }, 'demo account ready (demo@closeflow.io / Demo1234!)');
+    } catch (err) {
+      logger.warn({ err: (err as Error).message }, 'demo auto-seed skipped');
+    }
+  }
 
   registerInstantReplyWorker();
   registerVoiceCallWorker();

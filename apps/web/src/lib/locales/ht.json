@@ -44,6 +44,8 @@
   "voice": {
     "title": "Ajan vwa",
     "subtitle": "Ekip apèl milti-lang ou 24/7",
+    "engine": "Motè vwa",
+    "engineHint": "Chwazi sèvo IA ak vwa ajan ou yo itilize nan apèl yo — chanjman yo aplike sou nouvo apèl yo touswit.",
     "live": "Aktif",
     "ready": "Pare",
     "recentCalls": "Dènye apèl yo",
