@@ -328,3 +328,24 @@
     links (`/read/:slug`, `/portal/:kind/:token`) resolve; `render.yaml` builds/runs
     the API with `APP_URL` for CORS. Web Speech APIs require HTTPS — satisfied by
     Vercel/Render automatically. Suite: 90 passing.
+
+## 2026-07-03 — Elite "top-0.1% closer" agent persona
+
+68. **One reusable sales playbook** (`packages/shared/src/sales-persona.ts`,
+    `buildSalesSystemPrompt`) makes every voice agent sound like a warm, natural,
+    top-0.1% real-estate closer: conversational voice rules (1–2 sentence turns,
+    one question at a time, mirror the caller), a full discovery → build-desire →
+    ethical-influence → assumptive-close method (Cialdini principles, emotional
+    "why", tie-downs, honest urgency), and a scripted **objection-handling**
+    playbook (price, "just looking", "need to think", spouse, market timing,
+    call-back) using acknowledge → empathise → reframe → advance.
+69. **Multilingual by design** — the prompt instructs the agent to detect the
+    caller's language and always reply in it natively, switching mid-call if they
+    do (the opener uses the agent's configured language). Works for any language
+    the LLM supports, beyond the 5 UI locales.
+70. **Ethical guardrails, not deception** — the agent persuades by uncovering real
+    needs and framing genuine value; it must never invent prices/features, fake
+    scarcity, or pressure someone who declines. Used by BOTH the browser demo
+    (`/voice-agents/:key/demo`) and live provider calls (`workers/voice-call.ts`)
+    so behaviour is identical everywhere. The keyless fallback now does basic
+    objection handling too. Suite: 90 passing.

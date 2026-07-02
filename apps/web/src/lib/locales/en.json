@@ -472,7 +472,10 @@
     "fallbackGreeting": "Hi there, thanks for taking my call! How can I help you today?",
     "tapInterrupt": "Talk any time to interrupt — or tap to cut in",
     "insecure": "Live voice needs a secure (https) connection. Deployed on Vercel/Render it works automatically.",
-    "typeToTalk": "This browser can't hear you (no speech recognition) — type your reply and the agent speaks back."
+    "typeToTalk": "This browser can't hear you (no speech recognition) — type your reply and the agent speaks back.",
+    "yourTurn": "Your turn",
+    "tapToSpeak": "Tap the mic to speak",
+    "tapStop": "Tap to stop"
   },
   "voice": {
     "title": "Voice Agents",

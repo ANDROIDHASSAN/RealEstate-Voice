@@ -119,3 +119,63 @@ h1, h2, h3 {
   transform-origin: center bottom;
   animation: cf-wave 0.9s ease-in-out infinite;
 }
+
+/* ---- Hands-free Voice Mode: glass + reactive blob orb ---------------- */
+
+/* Frosted glass surface (used by the voice overlay + control pill) */
+.cf-glass {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 24px 70px -20px rgba(20, 40, 32, 0.35);
+}
+.cf-glass-dim {
+  background: rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* Overlay reveal */
+@keyframes cf-overlay-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cf-overlay-in { animation: cf-overlay-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* The orb: layered colored blobs that slowly rotate + morph inside a circle.
+   The wrapper is scaled live by mic amplitude via an inline --amp variable. */
+@keyframes cf-blob-rot { to { transform: rotate(360deg); } }
+@keyframes cf-blob-rot-rev { to { transform: rotate(-360deg); } }
+@keyframes cf-blob-morph {
+  0%, 100% { border-radius: 42% 58% 63% 37% / 45% 43% 57% 55%; }
+  33% { border-radius: 63% 37% 45% 55% / 58% 62% 38% 42%; }
+  66% { border-radius: 38% 62% 55% 45% / 40% 55% 45% 60%; }
+}
+@keyframes cf-orb-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+/* Soft outer halo that pulses while the assistant speaks/thinks */
+@keyframes cf-halo {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.12); }
+}
+.cf-orb-halo { animation: cf-halo 2.4s ease-in-out infinite; }
+.cf-orb-breathe { animation: cf-orb-breathe 4s ease-in-out infinite; }
+.cf-blob {
+  position: absolute;
+  filter: blur(14px);
+  mix-blend-mode: multiply;
+  animation: cf-blob-morph 8s ease-in-out infinite;
+}
+.cf-blob-spin { animation: cf-blob-rot 18s linear infinite, cf-blob-morph 9s ease-in-out infinite; }
+.cf-blob-spin-rev { animation: cf-blob-rot-rev 22s linear infinite, cf-blob-morph 11s ease-in-out infinite; }
+
+/* Concentric listening rings that expand outward from the orb */
+@keyframes cf-ripple {
+  0% { transform: scale(0.9); opacity: 0.5; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.cf-ripple { animation: cf-ripple 2.2s ease-out infinite; }

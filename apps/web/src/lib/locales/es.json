@@ -317,6 +317,9 @@
     "hold": "Toca para hablar",
     "say": "Escribe tu respuesta o toca el micrófono…",
     "noMic": "La entrada por voz no es compatible con este navegador — escribe.",
-    "badge": "Demo en el navegador · sin teléfono"
+    "badge": "Demo en el navegador · sin teléfono",
+    "yourTurn": "Tu turno",
+    "tapToSpeak": "Toca el micrófono para hablar",
+    "tapStop": "Toca para detener"
   }
 }

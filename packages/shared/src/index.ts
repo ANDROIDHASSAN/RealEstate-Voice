@@ -10,3 +10,4 @@ export * from './quotations.js';
 export * from './owner-suite.js';
 export * from './rbac.js';
 export * from './cms.js';
+export * from './sales-persona.js';

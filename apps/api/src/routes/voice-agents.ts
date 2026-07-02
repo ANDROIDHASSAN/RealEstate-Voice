@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import {
   AGENT_LANGUAGES,
   AGENT_TOOLS,
+  buildSalesSystemPrompt,
   LLM_MODELS,
   LLM_PROVIDERS,
   STT_MODELS,
@@ -123,14 +124,15 @@ voiceAgentsRouter.post('/:key/demo', async (req: Request, res: Response) => {
   const knowledge = toContextBlock(kb);
   const llm = getLLM();
 
-  const system = [
-    `You are ${agent.name}, a real-estate voice agent for ${account?.name ?? 'the business'}.`,
-    agent.systemPrompt ? `\nAgent instructions:\n${agent.systemPrompt}` : `\nGoal: ${agent.purpose}`,
-    account?.voiceSystemPrompt ? `\nCompany instructions:\n${account.voiceSystemPrompt}` : '',
-    knowledge ? `\nFACTS you may use (do not invent anything beyond these):\n${knowledge}` : '',
-    `\nYou are on a LIVE phone call. Reply with ONE short, natural spoken turn (1–3 sentences) in ${LANG_NAME[agent.language] ?? 'English'}.`,
-    'Do not narrate actions or use markdown. Keep moving the call toward the goal. If you do not know something, offer to have a human follow up.',
-  ].join('');
+  const system = buildSalesSystemPrompt({
+    agentName: agent.name,
+    businessName: account?.name ?? 'the business',
+    purpose: agent.purpose,
+    agentInstructions: agent.systemPrompt || undefined,
+    companyInstructions: account?.voiceSystemPrompt || undefined,
+    knowledge: knowledge || undefined,
+    defaultLanguage: LANG_NAME[agent.language] ?? 'English',
+  });
 
   const transcript =
     history.map((m) => `${m.role === 'user' ? 'Caller' : agent.name}: ${m.text}`).join('\n') + `\n${agent.name}:`;
@@ -164,13 +166,27 @@ function fillDemoMerge(text: string, account: { name?: string | null; ownerName?
     .trim();
 }
 
-/** Keyless demo reply — cites KB when available, else a helpful holding line. */
+/**
+ * Keyless demo reply — a lightweight closer: detects common objections and
+ * responds with acknowledge → reframe → advance, cites the KB when available.
+ * (Full multilingual conversation needs an LLM key; this keeps the demo alive.)
+ */
 function demoFallback(userText: string, knowledge: string, name: string): string {
+  const q = userText.toLowerCase();
+  const advance = 'Would Thursday at 5 or Saturday at 11 work better for a quick viewing?';
+  if (/expensive|too much|budget|afford|price|cost/.test(q))
+    return `I hear you on price. The right home is an investment, not just a cost — and financing can make the numbers work. If we made it fit, would the home itself be right for you? ${advance}`;
+  if (/think|not sure|maybe|later|not ready|just look/.test(q))
+    return `Totally fair — no pressure at all. What specifically would you want to think through: price, location, or timing? I'll get you the exact info so you can decide with confidence.`;
+  if (/spouse|wife|husband|partner|talk to/.test(q))
+    return `Smart — a decision like this should be made together. Could we do a quick 10-minute call with both of you so nobody feels rushed? ${advance}`;
+  if (/market|bad time|wait|interest rate|economy/.test(q))
+    return `Understandable. A lot of my buyers felt that too — then found waiting cost them the right place. Let's just get you ready so you can move when it's perfect. ${advance}`;
   if (knowledge) {
     const fact = knowledge.split('\n')[0]?.replace(/^-\s*\([^)]*\)\s*/, '') ?? '';
-    return `Good question. From what I have on file: ${fact.slice(0, 180)} Would you like me to book a quick call to go over the details?`;
+    return `Great question. From what I have on file: ${fact.slice(0, 170)} Want me to walk you through it on a quick viewing? ${advance}`;
   }
-  return `Thanks — I hear you on "${userText.slice(0, 60)}". Let me get you booked with ${name === 'you' ? 'our team' : 'one of our agents'} so we can help properly. What time works best? (Set an AI key for full conversational replies.)`;
+  return `Love that you reached out. Tell me — if we found the perfect place, what would that change for you? Then ${advance.charAt(0).toLowerCase()}${advance.slice(1)}`;
 }
 
 /** Delete a custom agent, or reset a preset override to defaults. */

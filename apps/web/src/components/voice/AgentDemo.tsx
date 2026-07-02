@@ -1,21 +1,23 @@
 import { useMutation } from '@tanstack/react-query';
-import { Bot, Keyboard, Mic, MicOff, PhoneOff, Send, Volume2, VolumeX } from 'lucide-react';
+import { Bot, Keyboard, Mic, PhoneOff, Send, Volume2, VolumeX } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../lib/api';
-import { speak, stopSpeaking, useMicLevel, useSpeech } from '../../lib/useSpeech';
+import { speak, stopSpeaking, useSpeech } from '../../lib/useSpeech';
 import { cn } from '../../lib/utils';
 
 interface Turn { role: 'user' | 'agent'; text: string }
-type CallState = 'connecting' | 'speaking' | 'listening' | 'thinking' | 'paused';
+type CallState = 'connecting' | 'idle' | 'listening' | 'thinking' | 'speaking';
 
 /**
- * Live browser call — a hands-free, voice-to-voice conversation with a voice
- * agent (no phone / Vapi). The agent greets and speaks (TTS); the mic opens
- * automatically (STT). The caller can BARGE IN — start talking while the agent
- * is speaking (voice-activity detection) or tap the orb — and the agent stops
- * and listens, like a real call. Works across browsers/devices, degrading to a
- * typed reply where speech recognition isn't available (e.g. iOS Safari).
+ * Live browser call — talk to a voice agent with no phone / Vapi.
+ *
+ * PUSH-TO-TALK by design: the agent speaks its turn, then WAITS. You tap the mic
+ * to reply; the mic is never open while (or right after) the agent is speaking,
+ * so it can't hear its own TTS through the speakers and talk to itself. This
+ * kills the echo/hallucination loop that "hands-free" auto-listen causes without
+ * hardware echo cancellation. Degrades to typing where speech recognition is
+ * unavailable (e.g. iOS Safari).
  */
 export function AgentDemo({ agentKey, agentName, onClose }: { agentKey: string; agentName: string; onClose: () => void }) {
   const { t, i18n } = useTranslation();
@@ -27,42 +29,22 @@ export function AgentDemo({ agentKey, agentName, onClose }: { agentKey: string; 
   const [seconds, setSeconds] = useState(0);
   const started = useRef(false);
   const voiceOnRef = useRef(true);
-  const pausedRef = useRef(false);
   const stateRef = useRef<CallState>('connecting');
   voiceOnRef.current = voiceOn;
   stateRef.current = state;
 
   const secure = typeof window === 'undefined' || window.isSecureContext;
-  const mic = useMicLevel();
-
-  const { supported: sttSupported, listening, interim, start, stop } = useSpeech((final) => submitRef.current(final));
   const submitRef = useRef<(text: string) => void>(() => {});
+  const { supported: sttSupported, listening, interim, start, stop } = useSpeech((final) => submitRef.current(final));
 
   const setCall = (s: CallState) => { stateRef.current = s; setState(s); };
 
-  const beginListening = useCallback(() => {
-    mic.disarm();
-    if (pausedRef.current || !sttSupported) { setCall('paused'); return; }
-    setCall('listening');
-    start();
-  }, [mic, sttSupported, start]);
-
-  // Barge-in: caller talks over the agent (or taps the orb) → cut TTS, listen.
-  const bargeIn = useCallback(() => {
-    if (stateRef.current !== 'speaking') return;
-    stopSpeaking();
-    beginListening();
-  }, [beginListening]);
-  useEffect(() => { mic.onSpeech(bargeIn); }, [mic, bargeIn]);
-
-  // The agent takes a turn: show it, speak it, arm barge-in, then open the mic.
+  // The agent takes a turn: speak it, then WAIT for the user (no auto-listen).
   const agentSpeaks = useCallback((text: string) => {
     setCall('speaking');
-    if (!voiceOnRef.current) { beginListening(); return; }
-    speak(text, i18n.language, () => { if (stateRef.current === 'speaking') beginListening(); });
-    // Arm voice barge-in after a short grace so the agent's first words don't self-trigger.
-    window.setTimeout(() => { if (stateRef.current === 'speaking') mic.arm(); }, 600);
-  }, [beginListening, i18n.language, mic]);
+    if (voiceOnRef.current) speak(text, i18n.language, () => { if (stateRef.current === 'speaking') setCall('idle'); });
+    else setCall('idle');
+  }, [i18n.language]);
 
   const send = useMutation({
     mutationFn: (messages: Turn[]) => api<{ reply: string }>(`/voice-agents/${agentKey}/demo`, { method: 'POST', body: { messages } }),
@@ -74,7 +56,6 @@ export function AgentDemo({ agentKey, agentName, onClose }: { agentKey: string; 
     const clean = text.trim();
     if (!clean || send.isPending) return;
     stop();
-    mic.disarm();
     setInput('');
     setCall('thinking');
     setTurns((prev) => {
@@ -82,14 +63,27 @@ export function AgentDemo({ agentKey, agentName, onClose }: { agentKey: string; 
       send.mutate(next);
       return next;
     });
-  }, [send, stop, mic]);
+  }, [send, stop]);
   submitRef.current = submit;
 
-  // Connect: grab the mic (best-effort, for barge-in + level) then the agent greets.
+  // User taps the mic to speak. Always stop the agent's audio first so the mic
+  // never captures TTS.
+  const startListening = useCallback(() => {
+    if (!sttSupported) return;
+    stopSpeaking();
+    setCall('listening');
+    start();
+  }, [sttSupported, start]);
+
+  const stopListening = useCallback(() => {
+    stop();
+    if (stateRef.current === 'listening') setCall('idle');
+  }, [stop]);
+
+  // Connect: the agent greets and speaks, then waits for you to tap the mic.
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    void mic.ensure();
     api<{ reply: string }>(`/voice-agents/${agentKey}/demo`, { method: 'POST', body: { messages: [] } })
       .then((d) => { setTurns([{ role: 'agent', text: d.reply }]); agentSpeaks(d.reply); })
       .catch(() => { const g = t('demo.fallbackGreeting'); setTurns([{ role: 'agent', text: g }]); agentSpeaks(g); });
@@ -101,26 +95,21 @@ export function AgentDemo({ agentKey, agentName, onClose }: { agentKey: string; 
     return () => window.clearInterval(id);
   }, []);
 
-  const hangUp = useCallback(() => { stopSpeaking(); stop(); mic.stopAll(); onClose(); }, [onClose, stop, mic]);
+  const hangUp = useCallback(() => { stopSpeaking(); stop(); onClose(); }, [onClose, stop]);
   useEffect(() => () => { stopSpeaking(); }, []);
 
-  const togglePause = () => {
-    if (pausedRef.current) { pausedRef.current = false; beginListening(); }
-    else { pausedRef.current = true; stop(); stopSpeaking(); mic.disarm(); setCall('paused'); }
-  };
-
-  const onOrbTap = () => {
-    if (state === 'speaking') bargeIn();
-    else if (state === 'paused' && sttSupported) { pausedRef.current = false; beginListening(); }
+  // Primary control (orb + mic button): interrupt while speaking, else toggle mic.
+  const onMicControl = () => {
+    if (state === 'speaking') { stopSpeaking(); setCall('idle'); return; }
+    if (state === 'listening') stopListening();
+    else startListening();
   };
 
   const lastAgent = [...turns].reverse().find((x) => x.role === 'agent')?.text ?? '';
-  const caption = interim ? interim : state === 'listening' ? t('demo.listening') : lastAgent;
+  const caption = state === 'listening' ? (interim || t('demo.listening')) : lastAgent;
   const mmss = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
-  const statusLabel = { connecting: t('demo.connecting'), speaking: t('demo.speaking'), listening: t('demo.listening'), thinking: t('demo.thinking'), paused: t('demo.paused') }[state];
-  const orbClass = state === 'speaking' ? 'bg-card-purple ring-card-purple' : state === 'listening' ? 'bg-card-pink ring-card-pink' : state === 'thinking' ? 'bg-card-yellow ring-card-yellow' : 'bg-surface-2 ring-black/5';
-  // Orb scales with live mic level while listening/speaking for a "live" feel.
-  const pulse = 1 + Math.min(0.22, mic.level * 1.6) * (state === 'listening' || state === 'speaking' ? 1 : 0);
+  const statusLabel = { connecting: t('demo.connecting'), idle: t('demo.yourTurn'), listening: t('demo.listening'), thinking: t('demo.thinking'), speaking: t('demo.speaking') }[state];
+  const orbClass = state === 'speaking' ? 'bg-card-purple ring-card-purple' : state === 'listening' ? 'bg-card-pink ring-card-pink cf-mic-live' : state === 'thinking' ? 'bg-card-yellow ring-card-yellow' : 'bg-surface-2 ring-black/5';
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm sm:p-4" onClick={hangUp}>
@@ -142,19 +131,20 @@ export function AgentDemo({ agentKey, agentName, onClose }: { agentKey: string; 
         {/* Live call stage */}
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 overflow-y-auto px-6 py-4">
           <button
-            onClick={onOrbTap}
-            title={state === 'speaking' ? t('demo.tapInterrupt') : ''}
-            className={cn('flex h-36 w-36 items-center justify-center rounded-full ring-8 transition-[background-color,box-shadow] duration-300', orbClass, state === 'listening' && 'cf-mic-live')}
-            style={{ transform: `scale(${pulse.toFixed(3)})`, transition: 'transform 90ms linear, background-color .3s' }}
+            onClick={onMicControl}
+            disabled={state === 'thinking' || state === 'connecting' || !sttSupported}
+            title={state === 'speaking' ? t('demo.tapInterrupt') : state === 'listening' ? t('demo.tapStop') : t('demo.tapToSpeak')}
+            className={cn('flex h-36 w-36 items-center justify-center rounded-full ring-8 transition-[background-color,box-shadow] duration-300 disabled:opacity-70', orbClass)}
           >
             <div className="flex h-24 w-24 items-center justify-center rounded-full bg-surface/70">
               {state === 'listening' ? <Mic className="h-9 w-9" /> : state === 'thinking' ? (
                 <span className="flex gap-1"><span className="cf-typing-dot" /><span className="cf-typing-dot" style={{ animationDelay: '150ms' }} /><span className="cf-typing-dot" style={{ animationDelay: '300ms' }} /></span>
-              ) : <Bot className="h-9 w-9" />}
+              ) : state === 'idle' ? <Mic className="h-9 w-9 text-ink-soft" /> : <Bot className="h-9 w-9" />}
             </div>
           </button>
           <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">{statusLabel}</p>
-          {state === 'speaking' && <p className="-mt-3 text-[11px] text-ink-soft">{t('demo.tapInterrupt')}</p>}
+          {sttSupported && state === 'idle' && <p className="-mt-3 text-[11px] text-ink-soft">👆 {t('demo.tapToSpeak')}</p>}
+          {sttSupported && state === 'speaking' && <p className="-mt-3 text-[11px] text-ink-soft">{t('demo.tapInterrupt')}</p>}
           <p className="min-h-[3.5rem] max-w-sm text-center text-lg leading-snug" dir="auto">{caption}</p>
         </div>
 
@@ -180,9 +170,10 @@ export function AgentDemo({ agentKey, agentName, onClose }: { agentKey: string; 
         {/* Call controls — always visible */}
         <div className="flex shrink-0 items-center justify-center gap-4 border-t border-black/5 px-5 py-4">
           {sttSupported && (
-            <button onClick={togglePause} title={state === 'paused' ? t('demo.resume') : t('demo.mute')}
-              className={cn('flex h-12 w-12 items-center justify-center rounded-full transition-colors', state === 'paused' ? 'bg-surface-2 text-ink-soft' : 'bg-card-blue')}>
-              {state === 'paused' ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            <button onClick={onMicControl} disabled={state === 'thinking' || state === 'connecting'}
+              title={state === 'listening' ? t('demo.tapStop') : t('demo.tapToSpeak')}
+              className={cn('flex h-14 w-14 items-center justify-center rounded-full transition-colors disabled:opacity-50', state === 'listening' ? 'cf-mic-live bg-card-pink text-ink' : 'bg-card-blue text-ink')}>
+              <Mic className="h-6 w-6" />
             </button>
           )}
           <button onClick={hangUp} title={t('demo.hangUp')} className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-500 text-white shadow-soft transition-transform hover:scale-105">

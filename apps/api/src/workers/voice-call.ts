@@ -1,5 +1,5 @@
 import { getVoiceProvider, type VoiceCallResult } from '@truecode/voice';
-import { getVoiceAgent, voiceAgentForLocale, type Locale } from '@truecode/shared';
+import { buildSalesSystemPrompt, getVoiceAgent, voiceAgentForLocale, type Locale } from '@truecode/shared';
 import { logger } from '../logger.js';
 import { complianceCheck } from '../lib/compliance.js';
 import { emitAgentEvent } from '../lib/events.js';
@@ -83,8 +83,18 @@ export function registerVoiceCallWorker(): void {
     const kb = await retrieve(accountId, ragQuery || 'buyer seller financing process', 4).catch(() => []);
     const knowledge = toContextBlock(kb);
 
-    // Agent-level persona + account-wide instructions both inform the prompt.
-    const combinedPrompt = [account.voiceSystemPrompt, agent.systemPrompt].filter(Boolean).join('\n\n') || undefined;
+    // Elite closer persona (top-0.1% salesperson: discovery, persuasion
+    // psychology, multilingual, objection handling) + the agent's own persona +
+    // account-wide instructions. Knowledge is passed to the provider separately.
+    const LANG_NAME: Record<string, string> = { en: 'English', es: 'Spanish', ar: 'Arabic', pt: 'Portuguese', ht: 'Haitian Creole' };
+    const combinedPrompt = buildSalesSystemPrompt({
+      agentName: agent.name,
+      businessName: account.name,
+      purpose: agent.purpose,
+      agentInstructions: agent.systemPrompt || undefined,
+      companyInstructions: account.voiceSystemPrompt || undefined,
+      defaultLanguage: LANG_NAME[agent.language] ?? 'English',
+    });
 
     try {
       const { providerCallId } = await provider.startOutboundCall({

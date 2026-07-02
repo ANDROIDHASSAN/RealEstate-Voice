@@ -317,6 +317,9 @@
     "hold": "Peze pou pale",
     "say": "Tape repons ou oswa peze mikwo a…",
     "noMic": "Antre vwa pa sipòte nan navigatè sa a — tape.",
-    "badge": "Demo nan navigatè · san telefòn"
+    "badge": "Demo nan navigatè · san telefòn",
+    "yourTurn": "Se tou pa w",
+    "tapToSpeak": "Peze mikwo a pou pale",
+    "tapStop": "Peze pou sispann"
   }
 }
