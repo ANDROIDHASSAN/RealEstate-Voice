@@ -73,3 +73,20 @@
     reads/writes the same `/integrations/voice` options (VOICE_LLM_PROVIDER,
     VOICE_LLM_MODEL, VOICE_TTS_PROVIDER) as Settings — so the model can be
     picked right where calls are configured.
+
+## 2026-07-02 — Voice self-test ("call me now")
+
+35. **Live self-test call** (`POST /calls/test` + `GET /calls/test-info`, Voice
+    page "Test your voice agent" card): places an outbound call to the user's own
+    number so they can hear the agent. Reuses one `source:'test'` lead per account
+    with full consent (the user explicitly requested it) and bypasses quiet hours
+    for the live self-test (not automated bulk). Real when Vapi/Dograh is
+    configured; a simulated lifecycle + transcript in mock mode.
+36. **Voice worker resolves the provider PER JOB** (was captured once at boot), so
+    switching the call provider in Settings/Voice takes effect live via
+    `resetVoiceProvider()`. It also now catches `startOutboundCall` errors and
+    marks the call `failed` with the reason (e.g. "Vapi HTTP 401") instead of
+    leaving it stuck at "queued".
+37. **Call-provider + in-call LLM/TTS selectors are on the Voice page** (not just
+    Settings) so a demo can be configured where calls happen — pick Mock for a
+    guaranteed simulated run, or a real provider to dial an actual phone.

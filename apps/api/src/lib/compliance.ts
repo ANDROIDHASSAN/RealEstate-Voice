@@ -18,6 +18,8 @@ export async function complianceCheck(opts: {
   leadId: string;
   kind: OutboundKind;
   timezoneOffsetMinutes?: number;
+  /** User-initiated live test call to their own number — quiet hours don't apply. */
+  bypassQuietHours?: boolean;
 }): Promise<ComplianceCheck> {
   const [lead, compliance] = await Promise.all([
     Lead.findOne({ _id: opts.leadId, accountId: opts.accountId }),
@@ -60,8 +62,8 @@ export async function complianceCheck(opts: {
     const offset = opts.timezoneOffsetMinutes ?? guessOffsetMinutes(lead.locale ?? 'en');
     const localHour = (24 + new Date(Date.now() + offset * 60_000).getUTCHours()) % 24;
     if (localHour < start || localHour >= end) {
-      // In tests we allow forcing quiet hours off via env.
-      if (process.env.COMPLIANCE_IGNORE_QUIET_HOURS !== '1') return deny('quiet_hours');
+      // In tests we allow forcing quiet hours off via env; live self-tests bypass too.
+      if (!opts.bypassQuietHours && process.env.COMPLIANCE_IGNORE_QUIET_HOURS !== '1') return deny('quiet_hours');
     }
   }
 

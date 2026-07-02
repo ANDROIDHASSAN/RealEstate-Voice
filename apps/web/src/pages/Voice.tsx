@@ -1,16 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Cpu, Phone, PhoneCall, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { Cpu, Phone, PhoneCall, PhoneOutgoing, Sparkles } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
 import { Card, CardDescription, CardTitle } from '../components/ui/card';
-import { Label, Select } from '../components/ui/input';
+import { Input, Label, Select } from '../components/ui/input';
 import { PageSkeleton } from '../components/ui/skeleton';
 import { EmptyState, ErrorState } from '../components/ui/states';
 import { api } from '../lib/api';
-import { timeAgo } from '../lib/utils';
+import { cn, timeAgo } from '../lib/utils';
 
 interface ProviderOption {
   var: string;
@@ -23,7 +24,7 @@ interface IntegrationsResponse {
 }
 
 // Which voice-pipeline dropdowns to surface right here on the Voice page.
-const VOICE_ENGINE_VARS = ['VOICE_LLM_PROVIDER', 'VOICE_LLM_MODEL', 'VOICE_TTS_PROVIDER'];
+const VOICE_ENGINE_VARS = ['VOICE_PROVIDER', 'VOICE_LLM_PROVIDER', 'VOICE_LLM_MODEL', 'VOICE_TTS_PROVIDER'];
 
 /** In-call AI brain + voice selectors — writes through /integrations/voice. */
 function VoiceEngineCard() {
@@ -64,6 +65,7 @@ function VoiceEngineCard() {
                 {o.label}
               </Label>
               <Select
+                aria-label={o.label}
                 defaultValue={o.value}
                 disabled={save.isPending}
                 onChange={(e) => save.mutate({ [o.var]: e.target.value })}
@@ -99,7 +101,141 @@ interface CallRow {
   summary?: string;
   transcript?: { role: string; text: string; ts: number }[];
   createdAt: string;
-  leadId?: { firstName?: string; lastName?: string; locale?: string };
+  leadId?: { _id?: string; firstName?: string; lastName?: string; locale?: string };
+}
+
+interface TestInfo {
+  inboundNumber: string;
+  provider: string;
+  live: boolean;
+  reason?: string;
+  defaultPhone: string;
+}
+
+const CALL_STAGES = ['queued', 'ringing', 'in-progress', 'completed'];
+
+/** Live self-test: call your own number and watch the agent run end-to-end. */
+function VoiceTestCard({ agents }: { agents: AgentCfg[] }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const info = useQuery({ queryKey: ['calls-test-info'], queryFn: () => api<TestInfo>('/calls/test-info') });
+  const [phone, setPhone] = useState('');
+  const [agentKey, setAgentKey] = useState('speed-to-lead');
+  const [testLeadId, setTestLeadId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (info.data?.defaultPhone && !phone) setPhone(info.data.defaultPhone);
+  }, [info.data, phone]);
+
+  // Share the ['calls'] cache; poll faster while a test call is in flight.
+  const calls = useQuery({
+    queryKey: ['calls'],
+    queryFn: () => api<{ items: CallRow[] }>('/calls'),
+    refetchInterval: testLeadId ? 2000 : false,
+  });
+  const testCall = (calls.data?.items ?? []).find((c) => c.leadId?._id === testLeadId);
+  const done = testCall && ['completed', 'failed', 'blocked'].includes(testCall.status);
+
+  const trigger = useMutation({
+    mutationFn: () => api<{ leadId: string }>('/calls/test', { method: 'POST', body: { agentKey, phone } }),
+    onSuccess: (d) => {
+      setTestLeadId(d.leadId);
+      void qc.invalidateQueries({ queryKey: ['calls'] });
+    },
+  });
+
+  const stageIndex = testCall ? CALL_STAGES.indexOf(testCall.status) : -1;
+
+  return (
+    <Card tone="green">
+      <div className="mb-1 flex items-center gap-2">
+        <PhoneOutgoing className="h-5 w-5" />
+        <CardTitle>{t('voice.test')}</CardTitle>
+        {info.data && (
+          <Badge tone={info.data.live ? 'green' : 'yellow'} className="ms-auto">
+            {info.data.live ? info.data.provider : t('voice.testSimulated')}
+          </Badge>
+        )}
+      </div>
+      <CardDescription className="mb-4">{t('voice.testHint')}</CardDescription>
+
+      <form
+        className="grid gap-4 sm:grid-cols-[1fr,1fr,auto] sm:items-end"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (phone.trim().length >= 7) trigger.mutate();
+        }}
+      >
+        <div>
+          <Label>{t('voice.testYourNumber')}</Label>
+          <Input
+            type="tel"
+            placeholder="+1305…"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label>{t('voice.testAgent')}</Label>
+          <Select value={agentKey} onChange={(e) => setAgentKey(e.target.value)}>
+            {agents.map((a) => (
+              <option key={a.key} value={a.key}>
+                {a.name} {a.status === 'live' ? '● live' : ''}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <Button type="submit" disabled={trigger.isPending || phone.trim().length < 7}>
+          <PhoneCall className="h-4 w-4" /> {trigger.isPending ? '…' : t('voice.testCallMe')}
+        </Button>
+      </form>
+
+      {info.data && (
+        <p className="mt-3 text-xs text-ink-soft">
+          {info.data.inboundNumber
+            ? t('voice.testInbound', { number: info.data.inboundNumber })
+            : t('voice.testNoInbound')}
+        </p>
+      )}
+
+      {/* Live call progress */}
+      {testCall && (
+        <div className="mt-5 rounded-2xl bg-surface p-4">
+          <div className="mb-3 flex items-center gap-2">
+            {CALL_STAGES.map((stage, i) => (
+              <div key={stage} className="flex flex-1 items-center gap-2">
+                <span
+                  className={cn(
+                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                    i < stageIndex || done ? 'bg-card-green' : i === stageIndex ? 'cf-mic-live bg-accent text-accent-on' : 'bg-surface-2 text-ink-soft',
+                  )}
+                >
+                  {i + 1}
+                </span>
+                {i < CALL_STAGES.length - 1 && <span className="h-0.5 flex-1 rounded bg-black/5" />}
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <Badge tone={testCall.outcome === 'booked' ? 'green' : testCall.status === 'blocked' ? 'pink' : 'blue'} className="capitalize">
+              {testCall.outcome ?? testCall.status}
+            </Badge>
+            <span className="text-ink-soft">{testCall.summary ?? t('voice.testInProgress')}</span>
+          </div>
+          {done && testCall.transcript && testCall.transcript.length > 0 && (
+            <div className="mt-3 space-y-2 rounded-2xl bg-surface-2 p-3">
+              <p className="text-xs font-medium text-ink-soft">{t('voice.transcript')}</p>
+              {testCall.transcript.map((turn, i) => (
+                <p key={i} className="text-sm" dir="auto">
+                  <span className={turn.role === 'agent' ? 'font-semibold' : 'text-ink-soft'}>{turn.role === 'agent' ? '🤖' : '👤'}</span> {turn.text}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
 }
 
 const langFlag: Record<string, string> = { en: '🇺🇸', es: '🇪🇸', ar: '🇸🇦', pt: '🇧🇷', ht: '🇭🇹' };
@@ -129,7 +265,10 @@ export default function Voice() {
     <div className="space-y-6">
       <PageHeader title={t('voice.title')} subtitle={t('voice.subtitle')} />
 
-      <VoiceEngineCard />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <VoiceTestCard agents={agents.data?.agents ?? []} />
+        <VoiceEngineCard />
+      </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">

@@ -16,10 +16,16 @@ import { Account, Appointment, Call, Lead, UsageLedger } from '../models.js';
  */
 export function registerVoiceCallWorker(): void {
   const queue = getQueue();
-  const provider = getVoiceProvider();
-  provider.onCallComplete(handleVoiceProviderEvent);
+  // Register the completion handler on the initial provider (for inbound
+  // webhooks that may arrive before the first outbound job runs).
+  getVoiceProvider().onCallComplete(handleVoiceProviderEvent);
 
   queue.process(QUEUES.voiceCall, async (data) => {
+    // Resolve the provider PER JOB so switching it in Settings/Voice takes
+    // effect live (the singleton is rebuilt after resetVoiceProvider()).
+    const provider = getVoiceProvider();
+    provider.onCallComplete(handleVoiceProviderEvent);
+
     const accountId = String(data.accountId);
     const leadId = String(data.leadId);
     const requestedKey = String(data.agentKey ?? 'speed-to-lead');
@@ -39,7 +45,7 @@ export function registerVoiceCallWorker(): void {
           ? voiceAgentForLocale(locale)
           : (getVoiceAgent(requestedKey) ?? voiceAgentForLocale(locale));
 
-    const check = await complianceCheck({ accountId, leadId, kind: 'call' });
+    const check = await complianceCheck({ accountId, leadId, kind: 'call', bypassQuietHours: Boolean(data.test) });
     const call = await Call.create({
       accountId,
       leadId,
@@ -63,29 +69,46 @@ export function registerVoiceCallWorker(): void {
       suggestedSlot: 'tomorrow at 3 PM',
     };
 
-    const { providerCallId } = await provider.startOutboundCall({
-      callRef: String(call._id),
-      to: lead.phone,
-      agentKey: agent.key,
-      locale: agent.language,
-      resolvedScript: agent.script.map((line) => mergeFields(line, ctx)),
-      voiceId: agent.voiceId,
-      tools: agent.tools,
-      transferRule: mergeFields(agent.transferRule, ctx),
-      metadata: { accountId, leadId },
-    });
-
-    call.providerCallId = providerCallId;
-    call.status = 'ringing';
-    await call.save();
-    emitAgentEvent(accountId, {
-      type: 'call',
-      agentKey: agent.key,
-      title: `${agent.name} is calling ${lead.firstName}`,
-      detail: `Dialing ${lead.phone} via ${provider.name}`,
-      status: 'running',
-    });
-    logger.info({ callId: String(call._id), agentKey: agent.key, provider: provider.name }, 'voice call started');
+    try {
+      const { providerCallId } = await provider.startOutboundCall({
+        callRef: String(call._id),
+        to: lead.phone,
+        agentKey: agent.key,
+        locale: agent.language,
+        resolvedScript: agent.script.map((line) => mergeFields(line, ctx)),
+        voiceId: agent.voiceId,
+        tools: agent.tools,
+        transferRule: mergeFields(agent.transferRule, ctx),
+        metadata: { accountId, leadId },
+      });
+      call.providerCallId = providerCallId;
+      call.status = 'ringing';
+      await call.save();
+      emitAgentEvent(accountId, {
+        type: 'call',
+        agentKey: agent.key,
+        title: `${agent.name} is calling ${lead.firstName}`,
+        detail: `Dialing ${lead.phone} via ${provider.name}`,
+        status: 'running',
+      });
+      logger.info({ callId: String(call._id), agentKey: agent.key, provider: provider.name }, 'voice call started');
+    } catch (err) {
+      // A bad/expired provider key (e.g. Vapi 401) must not hang the call at
+      // "queued" — mark it failed with the reason so the UI shows what happened.
+      const reason = (err as Error).message;
+      call.status = 'failed';
+      call.summary = `Call could not start via ${provider.name}: ${reason}. Check the provider key in Settings, or switch to Mock to simulate.`;
+      await call.save();
+      emitAgentEvent(accountId, {
+        type: 'call',
+        agentKey: agent.key,
+        title: `Call failed to start (${provider.name})`,
+        detail: reason,
+        status: 'error',
+      });
+      logger.error({ callId: String(call._id), provider: provider.name, err: reason }, 'voice call failed to start');
+      // Don't rethrow — retrying a bad key just loops.
+    }
   });
 }
 

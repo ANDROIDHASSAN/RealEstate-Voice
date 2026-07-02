@@ -67,6 +67,20 @@ test.describe.serial('CloseFlow E2E', () => {
     await expect(page.getByText(/booked|qualified/).first()).toBeVisible({ timeout: 30_000 });
   });
 
+  test('voice: "call me now" self-test runs a live call with transcript', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('#email', `gate${stamp}@test.io`);
+    await page.fill('#password', 'Passw0rd!123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/');
+    await page.goto('/voice');
+    await expect(page.getByText('Test your voice agent')).toBeVisible();
+    await page.getByPlaceholder('+1305…').fill('+13055550188');
+    await page.getByRole('button', { name: /Call me now/i }).click();
+    // Mock provider drives the call to completion; transcript renders when done
+    await expect(page.getByText('Transcript').first()).toBeVisible({ timeout: 20_000 });
+  });
+
   test('voice: in-call LLM selector on the voice page persists', async ({ page }) => {
     await page.goto('/login');
     await page.fill('#email', `gate${stamp}@test.io`);
@@ -76,12 +90,10 @@ test.describe.serial('CloseFlow E2E', () => {
     await page.goto('/voice');
     await expect(page.getByText('Voice engine')).toBeVisible();
     // The "In-call brain (provider)" dropdown → OpenAI, auto-saves on change
-    const card = page.locator('div', { has: page.getByText('Voice engine') }).first();
-    const brain = card.getByRole('combobox').first();
-    await brain.selectOption('openai');
+    await page.getByLabel('In-call brain (provider)').selectOption('openai');
     await page.waitForTimeout(500);
     await page.reload();
-    await expect(card.getByRole('combobox').first()).toHaveValue('openai');
+    await expect(page.getByLabel('In-call brain (provider)')).toHaveValue('openai');
   });
 
   test('follow-up: sequence builder creates a sequence', async ({ page }) => {

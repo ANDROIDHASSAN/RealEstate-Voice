@@ -11,6 +11,7 @@ process.env.MOCK_CALL_DELAY_MS = '300';
 const { connectDb, disconnectDb } = await import('../src/db.js');
 const { createApp } = await import('../src/app.js');
 const { registerInstantReplyWorker } = await import('../src/workers/instant-reply.js');
+const { registerVoiceCallWorker } = await import('../src/workers/voice-call.js');
 const { closeQueue } = await import('../src/lib/queue.js');
 
 let app: Express;
@@ -23,6 +24,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 beforeAll(async () => {
   await connectDb();
   registerInstantReplyWorker();
+  registerVoiceCallWorker();
   app = createApp();
 
   const a = await request(app).post('/auth/signup').send({
@@ -188,6 +190,47 @@ describe('assistant commands', () => {
     expect(res.body.context).toHaveProperty('totalLeads');
     expect(res.body.context).toHaveProperty('modules');
     expect(Array.isArray(res.body.context.recentLeads)).toBe(true);
+  });
+});
+
+describe('voice self-test', () => {
+  it('exposes test-info (provider + inbound number)', async () => {
+    const res = await request(app).get('/calls/test-info').set('Authorization', `Bearer ${tokenA}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('provider');
+    expect(res.body).toHaveProperty('inboundNumber');
+  });
+
+  it('places a self-test call to the given number and creates a Call', async () => {
+    const res = await request(app)
+      .post('/calls/test')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ agentKey: 'speed-to-lead', phone: '+13055550123' });
+    expect(res.status).toBe(202);
+    expect(res.body.leadId).toBeTruthy();
+    await sleep(1500);
+    const calls = await request(app).get('/calls').set('Authorization', `Bearer ${tokenA}`);
+    const testCall = calls.body.items.find((c: { leadId?: { _id?: string } }) => c.leadId?._id === res.body.leadId);
+    expect(testCall).toBeDefined();
+    expect(['ringing', 'in-progress', 'completed']).toContain(testCall.status);
+  });
+
+  it('reuses one test lead (does not pile up test leads)', async () => {
+    await request(app).post('/calls/test').set('Authorization', `Bearer ${tokenA}`).send({ agentKey: 'speed-to-lead', phone: '+13055550124' });
+    const leads = await request(app).get('/leads?limit=100').set('Authorization', `Bearer ${tokenA}`);
+    const testLeads = leads.body.items.filter((l: { source: string }) => l.source === 'test');
+    expect(testLeads).toHaveLength(1);
+  });
+
+  it('requires the voice module (starter plan is blocked)', async () => {
+    const s = await request(app).post('/auth/signup').send({
+      accountName: 'Starter Co', name: 'Sam', email: `starter${Date.now()}@test.io`, password: 'Passw0rd!123',
+    });
+    const res = await request(app)
+      .post('/calls/test')
+      .set('Authorization', `Bearer ${s.body.accessToken}`)
+      .send({ agentKey: 'speed-to-lead', phone: '+13055550125' });
+    expect(res.status).toBe(403);
   });
 });
 
