@@ -150,7 +150,8 @@
   "assistant": {
     "title": "CloseFlow Assistant",
     "subtitle": "Type or speak — your agents do the work",
-    "intro": "Tell me what you want done — I'll route it to the right agent and you can watch it happen live.",
+    "snapshot": "I'm watching your account: {{total}} leads total, {{week}} new this week, {{appts}} appointments booked. Ask me anything about it.",
+    "intro": "Tell me what you want done — I'll route it to the right agent and you can watch it happen live. I can chain steps too: \"find luxury buyers in Miami and email them\".",
     "example1": "Go to leads",
     "example2": "Find luxury buyers in Miami",
     "example3": "Add lead John Smith phone +13055551234",

@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bot, Mic, MicOff, Send, Sparkles, Volume2, VolumeX, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,11 +16,21 @@ interface AssistantStep {
   status: 'done' | 'error' | 'blocked';
 }
 
+interface ClientAction {
+  type: string;
+  path?: string;
+  locale?: string;
+  entity?: string;
+  leadId?: string;
+  goal?: string;
+}
+
 interface AssistantResponse {
-  action: string;
+  plan: string[];
   reply: string;
   steps: AssistantStep[];
-  clientAction?: { type: string; path?: string; locale?: string; entity?: string; leadId?: string; goal?: string };
+  clientAction?: ClientAction;
+  clientActions?: ClientAction[];
   llm: { name: string; live: boolean };
 }
 
@@ -46,6 +56,14 @@ export function CommandCenter() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
 
+  // The assistant knows the whole account — fetch a live snapshot when opened.
+  const context = useQuery({
+    queryKey: ['assistant-context'],
+    queryFn: () => api<{ context: { totalLeads: number; leadsThisWeek: number; appointmentsThisWeek: number } }>('/assistant/context'),
+    enabled: open,
+    staleTime: 30_000,
+  });
+
   const command = useMutation({
     mutationFn: (text: string) =>
       api<AssistantResponse>('/assistant/command', {
@@ -55,17 +73,23 @@ export function CommandCenter() {
     onSuccess: (d) => {
       setMessages((prev) => [...prev, { role: 'assistant', text: d.reply, steps: d.steps }]);
       if (voiceReplies) speak(d.reply, i18n.language);
-      const ca = d.clientAction;
-      if (!ca) return;
-      if (ca.type === 'navigate' && ca.path) navigate(ca.path);
-      if (ca.type === 'set_language' && ca.locale) setLocale(ca.locale);
-      if (ca.type === 'refresh') void qc.invalidateQueries();
-      if (ca.type === 'orchestrate' && ca.leadId) {
-        navigate('/agents');
-        void api('/orchestrator/run', { method: 'POST', body: { leadId: ca.leadId, goal: ca.goal ?? 'move this lead forward' } })
-          .then(() => qc.invalidateQueries({ queryKey: ['agent-runs'] }))
-          .catch(() => undefined);
+      // Execute every client action the plan produced (refreshes, then one nav).
+      const actions = d.clientActions?.length ? d.clientActions : d.clientAction ? [d.clientAction] : [];
+      let navigated = false;
+      for (const ca of actions) {
+        if (ca.type === 'set_language' && ca.locale) setLocale(ca.locale);
+        if (ca.type === 'refresh') void qc.invalidateQueries();
+        if (ca.type === 'orchestrate' && ca.leadId) {
+          navigate('/agents');
+          navigated = true;
+          void api('/orchestrator/run', { method: 'POST', body: { leadId: ca.leadId, goal: ca.goal ?? 'move this lead forward' } })
+            .then(() => qc.invalidateQueries({ queryKey: ['agent-runs'] }))
+            .catch(() => undefined);
+        }
       }
+      // A single navigate wins last so the user lands where the work happened.
+      const nav = actions.find((a) => a.type === 'navigate' && a.path);
+      if (nav?.path && !navigated) navigate(nav.path);
     },
     onError: () => {
       setMessages((prev) => [...prev, { role: 'assistant', text: t('assistant.error') }]);
@@ -148,6 +172,15 @@ export function CommandCenter() {
           <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
             {messages.length === 0 && (
               <div className="space-y-2">
+                {context.data && (
+                  <div className="rounded-2xl bg-card-green px-4 py-3 text-sm">
+                    {t('assistant.snapshot', {
+                      total: context.data.context.totalLeads,
+                      week: context.data.context.leadsThisWeek,
+                      appts: context.data.context.appointmentsThisWeek,
+                    })}
+                  </div>
+                )}
                 <p className="text-sm text-ink-soft">{t('assistant.intro')}</p>
                 {[t('assistant.example1'), t('assistant.example2'), t('assistant.example3')].map((ex) => (
                   <button

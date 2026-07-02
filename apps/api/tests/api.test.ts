@@ -119,7 +119,7 @@ describe('assistant commands', () => {
       .set('Authorization', `Bearer ${tokenA}`)
       .send({ text: 'go to leads', locale: 'en' });
     expect(res.status).toBe(200);
-    expect(res.body.action).toBe('navigate');
+    expect(res.body.plan).toContain('navigate');
     expect(res.body.clientAction.path).toBe('/leads');
   });
 
@@ -129,7 +129,7 @@ describe('assistant commands', () => {
       .set('Authorization', `Bearer ${tokenA}`)
       .send({ text: 'add lead Casper Test phone +13055557777', locale: 'en' });
     expect(res.status).toBe(200);
-    expect(res.body.action).toBe('create_lead');
+    expect(res.body.plan).toContain('create_lead');
     const leads = await request(app).get('/leads?limit=100').set('Authorization', `Bearer ${tokenA}`);
     const created = leads.body.items.find((l: { firstName: string }) => l.firstName === 'Casper');
     expect(created).toBeDefined();
@@ -141,7 +141,7 @@ describe('assistant commands', () => {
       .post('/assistant/command')
       .set('Authorization', `Bearer ${tokenA}`)
       .send({ text: 'purple monkey dishwasher', locale: 'en' });
-    expect(res.body.action).toBe('clarify');
+    expect(res.body.plan).toContain('clarify');
   });
 
   it('scrape command respects module gating (pro plan lacks leadEngine)', async () => {
@@ -151,6 +151,43 @@ describe('assistant commands', () => {
       .send({ text: 'find luxury buyers in Miami', locale: 'en' });
     expect(res.status).toBe(200);
     expect(res.body.reply).toMatch(/plan|Empire/i);
+  });
+
+  it('decomposes a compound command into a multi-step plan', async () => {
+    const res = await request(app)
+      .post('/assistant/command')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ text: 'add lead Nova Reyes and go to leads', locale: 'en' });
+    expect(res.status).toBe(200);
+    expect(res.body.plan).toEqual(['create_lead', 'navigate']);
+    const leads = await request(app).get('/leads?limit=100').set('Authorization', `Bearer ${tokenA}`);
+    expect(leads.body.items.some((l: { firstName: string }) => l.firstName === 'Nova')).toBe(true);
+  });
+
+  it('answers data questions from account context (no LLM needed)', async () => {
+    const res = await request(app)
+      .post('/assistant/command')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ text: 'how many leads do I have?', locale: 'en' });
+    expect(res.body.plan).toContain('answer');
+    expect(res.body.reply).toMatch(/\d+ leads? total/i);
+  });
+
+  it('bulk message on a fresh account touches zero leads gracefully', async () => {
+    const res = await request(app)
+      .post('/assistant/command')
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ text: 'message all new leads', locale: 'en' });
+    expect(res.status).toBe(200);
+    expect(res.body.plan).toContain('message_leads');
+  });
+
+  it('exposes an account context snapshot', async () => {
+    const res = await request(app).get('/assistant/context').set('Authorization', `Bearer ${tokenA}`);
+    expect(res.status).toBe(200);
+    expect(res.body.context).toHaveProperty('totalLeads');
+    expect(res.body.context).toHaveProperty('modules');
+    expect(Array.isArray(res.body.context.recentLeads)).toBe(true);
   });
 });
 
@@ -163,9 +200,10 @@ describe('agent activity events', () => {
     expect(res.body.items.some((e: { agentKey: string }) => e.agentKey === 'instant-reply')).toBe(true);
   });
 
-  it('tenant B sees none of tenant A activity', async () => {
+  it('tenant B never sees tenant A activity', async () => {
     const res = await request(app).get('/events/recent').set('Authorization', `Bearer ${tokenB}`);
-    expect(res.body.items).toHaveLength(0);
+    // B may have its own events, but none of A's (e.g. A's instant-reply runs).
+    expect(res.body.items.some((e: { agentKey: string }) => e.agentKey === 'instant-reply')).toBe(false);
   });
 
   it('SSE stream rejects missing/invalid tokens', async () => {

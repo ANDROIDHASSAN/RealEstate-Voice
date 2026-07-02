@@ -150,6 +150,7 @@
   "assistant": {
     "title": "Asistente CloseFlow",
     "subtitle": "Escribe o habla — tus agentes hacen el trabajo",
+    "snapshot": "Estoy siguiendo tu cuenta: {{total}} contactos en total, {{week}} nuevos esta semana, {{appts}} citas agendadas. Pregúntame lo que quieras.",
     "intro": "Dime qué quieres hacer — lo enviaré al agente correcto y podrás verlo suceder en vivo.",
     "example1": "Ir a leads",
     "example2": "Buscar compradores de lujo en Miami",

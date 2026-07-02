@@ -150,6 +150,7 @@
   "assistant": {
     "title": "Asistan CloseFlow",
     "subtitle": "Tape oswa pale — ajan ou yo fè travay la",
+    "snapshot": "M ap swiv kont ou: {{total}} kliyan antou, {{week}} nouvo semèn sa a, {{appts}} randevou pran. Mande m nenpòt bagay sou li.",
     "intro": "Di m sa ou vle fèt — m ap voye l bay bon ajan an epi ou ka gade l ap fèt an dirèk.",
     "example1": "Ale nan kliyan yo",
     "example2": "Jwenn achtè liks nan Miami",

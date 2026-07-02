@@ -98,19 +98,33 @@ export const assistantCommandSchema = z.object({
 });
 
 /** Actions the assistant is allowed to execute — a closed, auditable set. */
+export const ASSISTANT_ACTIONS = [
+  'navigate',
+  'create_lead',
+  'start_scrape',
+  'trigger_call',
+  'send_message',
+  'message_leads',
+  'call_leads',
+  'orchestrate',
+  'set_language',
+  'answer',
+  'clarify',
+] as const;
+
 export const assistantActionSchema = z.object({
-  action: z.enum([
-    'navigate',
-    'create_lead',
-    'start_scrape',
-    'trigger_call',
-    'send_message',
-    'orchestrate',
-    'set_language',
-    'answer',
-    'clarify',
-  ]),
+  action: z.enum(ASSISTANT_ACTIONS),
   params: z.record(z.unknown()).default({}),
+  reply: z.string().max(2000).default(''),
+});
+
+/**
+ * A multi-step plan. The assistant may chain several actions from one command
+ * ("find leads in Florida, message them, and call them") — each step is the
+ * same closed, Zod-validated action set, executed in order by the server.
+ */
+export const assistantPlanSchema = z.object({
+  steps: z.array(assistantActionSchema).min(1).max(6),
   reply: z.string().max(2000).default(''),
 });
 
