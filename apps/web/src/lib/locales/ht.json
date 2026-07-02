@@ -293,7 +293,10 @@
     "welcome": "Jere tout biznis imobilye ou sou pilòt otomatik",
     "tagline": "Reponn chak kliyan nan segonn. Kalifye ak vwa IA. Swiv pou tout tan.",
     "noAccount": "Ou poko gen kont?",
-    "haveAccount": "Ou gen yon kont deja?"
+    "haveAccount": "Ou gen yon kont deja?",
+    "or": "oswa",
+    "demo": "Eseye demo an dirèk la",
+    "demoNote": "Yon klik, san enskripsyon"
   },
   "common": {
     "loading": "Chajman…",

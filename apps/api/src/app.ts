@@ -40,9 +40,22 @@ export function createApp(): Express {
   const app = express();
   app.set('trust proxy', 1);
   app.use(helmet());
+  // CORS — allow the configured web origin, local dev, and any Vercel/Render
+  // deployment (incl. preview URLs) so the split web(Vercel)/api(Render) setup
+  // and mobile browsers work without per-deploy config. Reflects the request
+  // origin when allowed (required with credentials: true — no wildcard).
+  const allowOrigin = (origin: string): boolean =>
+    origin === env.appUrl ||
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+    /\.vercel\.app$/.test(origin) ||
+    /\.onrender\.com$/.test(origin);
   app.use(
     cors({
-      origin: [env.appUrl, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+      origin: (origin, cb) => {
+        // No Origin header (same-origin, curl, native/mobile webviews) → allow.
+        if (!origin || allowOrigin(origin)) return cb(null, true);
+        return cb(null, false);
+      },
       credentials: true,
     }),
   );

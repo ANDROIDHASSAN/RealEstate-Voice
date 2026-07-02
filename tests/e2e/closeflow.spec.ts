@@ -22,6 +22,13 @@ test.describe.serial('TrueCode AI E2E', () => {
     await page.addInitScript(() => localStorage.setItem('cf-onboarded', '1'));
   });
 
+  test('login: one-click demo button signs in and lands on the dashboard', async ({ page }) => {
+    await page.goto('/login');
+    await page.getByRole('button', { name: /Try the live demo/i }).click();
+    await page.waitForURL('**/', { timeout: 20_000 });
+    await expect(page.getByText('median first response')).toBeVisible({ timeout: 15_000 });
+  });
+
   test('signup → dashboard renders in reference style', async ({ page }) => {
     await signupViaUi(page, email);
     // Pastel design tokens actually applied
@@ -88,14 +95,15 @@ test.describe.serial('TrueCode AI E2E', () => {
     await page.click('button[type="submit"]');
     await page.waitForURL('**/');
     await page.goto('/voice');
-    await page.getByRole('button', { name: /Talk to this agent in the browser/i }).click();
+    // The demo button appears on the test card and in Agent Studio — use the first.
+    await page.getByRole('button', { name: /Talk to this agent in the browser/i }).first().click();
     // Live voice-to-voice call UI opens (agent greets and speaks).
     await expect(page.getByText(/Live call/i)).toBeVisible();
     // Headless browsers have no speech recognition — use the "type instead" fallback.
     await page.getByTitle(/Type instead/i).click();
     await page.getByPlaceholder(/Type your reply/i).fill('I want to buy a condo in Brickell');
     await page.getByPlaceholder(/Type your reply/i).press('Enter');
-    await expect(page.getByText('I want to buy a condo in Brickell')).toBeVisible();
+    await expect(page.getByText('I want to buy a condo in Brickell').first()).toBeVisible();
     await expect(page.getByText(/book|help|team|great|market|condo|brickell/i).first()).toBeVisible({ timeout: 15_000 });
   });
 

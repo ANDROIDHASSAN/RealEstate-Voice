@@ -293,7 +293,10 @@
     "welcome": "Gerencie todo o seu negócio imobiliário no piloto automático",
     "tagline": "Responda cada lead em segundos. Qualifique com voz de IA. Faça follow-up para sempre.",
     "noAccount": "Ainda não tem conta?",
-    "haveAccount": "Já tem uma conta?"
+    "haveAccount": "Já tem uma conta?",
+    "or": "ou",
+    "demo": "Testar a demo ao vivo",
+    "demoNote": "Um clique, sem cadastro"
   },
   "common": {
     "loading": "Carregando…",

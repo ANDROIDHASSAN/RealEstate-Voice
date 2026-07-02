@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { Home, Zap, PhoneCall, MessagesSquare } from 'lucide-react';
+import { Home, PlayCircle, Zap, PhoneCall, MessagesSquare } from 'lucide-react';
 import { api } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input, Label } from '../components/ui/input';
@@ -12,6 +12,9 @@ interface AuthResponse {
   user: SessionUser;
   account: SessionAccount;
 }
+
+const DEMO_EMAIL = 'demo@truecode.ai';
+const DEMO_PASSWORD = 'Demo1234!';
 
 export function AuthLayout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
@@ -51,12 +54,11 @@ export default function Login() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const doLogin = async (em: string, pw: string) => {
     setBusy(true);
     setError('');
     try {
-      const data = await api<AuthResponse>('/auth/login', { method: 'POST', body: { email, password } });
+      const data = await api<AuthResponse>('/auth/login', { method: 'POST', body: { email: em, password: pw } });
       setSession(data);
       navigate('/');
     } catch {
@@ -64,6 +66,19 @@ export default function Login() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void doLogin(email, password);
+  };
+
+  const demoLogin = async () => {
+    setEmail(DEMO_EMAIL);
+    setPassword(DEMO_PASSWORD);
+    // Best-effort: ensure the demo account exists (dev auto-seeds; no-op in prod).
+    await api('/auth/seed-demo', { method: 'POST' }).catch(() => undefined);
+    await doLogin(DEMO_EMAIL, DEMO_PASSWORD);
   };
 
   return (
@@ -83,6 +98,25 @@ export default function Login() {
           {t('auth.login')}
         </Button>
       </form>
+
+      {/* One-click demo */}
+      <div className="my-5 flex items-center gap-3 text-xs text-ink-soft">
+        <span className="h-px flex-1 bg-black/10" />
+        {t('auth.or')}
+        <span className="h-px flex-1 bg-black/10" />
+      </div>
+      <button
+        type="button"
+        onClick={() => void demoLogin()}
+        disabled={busy}
+        className="flex w-full items-center justify-center gap-2 rounded-pill bg-card-purple px-6 py-3 text-sm font-semibold text-ink transition-colors hover:brightness-95 disabled:opacity-50"
+      >
+        <PlayCircle className="h-5 w-5" /> {t('auth.demo')}
+      </button>
+      <p className="mt-2 text-center text-xs text-ink-soft">
+        {t('auth.demoNote')} · <span className="font-mono">{DEMO_EMAIL}</span> / <span className="font-mono">{DEMO_PASSWORD}</span>
+      </p>
+
       <p className="mt-6 text-center text-sm text-ink-soft">
         {t('auth.noAccount')}{' '}
         <Link to="/signup" className="font-medium text-ink underline">

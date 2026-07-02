@@ -293,7 +293,10 @@
     "welcome": "Gestiona todo tu negocio inmobiliario en piloto automático",
     "tagline": "Responde cada lead en segundos. Califica con voz IA. Da seguimiento para siempre.",
     "noAccount": "¿Aún no tienes cuenta?",
-    "haveAccount": "¿Ya tienes cuenta?"
+    "haveAccount": "¿Ya tienes cuenta?",
+    "or": "o",
+    "demo": "Probar la demo en vivo",
+    "demoNote": "Un clic, sin registro"
   },
   "common": {
     "loading": "Cargando…",

@@ -123,3 +123,98 @@ export function speak(text: string, locale: string, onEnd?: () => void): void {
 export function stopSpeaking(): void {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
 }
+
+/**
+ * Microphone level meter + voice-activity detection, used for barge-in (letting
+ * the caller talk over the agent) and to animate the call orb. Uses getUserMedia
+ * with echo cancellation so the agent's own TTS (played through the speakers)
+ * is suppressed from the mic and doesn't trip the detector. Best-effort: if the
+ * mic is denied/unavailable, everything degrades to tap-to-interrupt.
+ */
+export function useMicLevel(): {
+  level: number;
+  ready: boolean;
+  ensure: () => Promise<boolean>;
+  arm: () => void;
+  disarm: () => void;
+  onSpeech: (cb: (() => void) | null) => void;
+  stopAll: () => void;
+} {
+  const [level, setLevel] = useState(0);
+  const [ready, setReady] = useState(false);
+  const ctxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number>();
+  const armedRef = useRef(false);
+  const loudRef = useRef(0);
+  const cbRef = useRef<(() => void) | null>(null);
+
+  const loop = useCallback(() => {
+    const analyser = analyserRef.current;
+    if (!analyser) return;
+    const buf = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i += 1) {
+      const v = (buf[i]! - 128) / 128;
+      sum += v * v;
+    }
+    const rms = Math.sqrt(sum / buf.length);
+    setLevel((l) => l * 0.75 + rms * 0.25);
+    // Barge-in: sustained energy above threshold while armed → fire once.
+    if (armedRef.current && rms > 0.055) {
+      loudRef.current += 1;
+      if (loudRef.current >= 4) {
+        armedRef.current = false;
+        loudRef.current = 0;
+        cbRef.current?.();
+      }
+    } else if (loudRef.current > 0) {
+      loudRef.current -= 1;
+    }
+    rafRef.current = requestAnimationFrame(loop);
+  }, []);
+
+  const ensure = useCallback(async () => {
+    if (ready) return true;
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) return false;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      streamRef.current = stream;
+      const Ctx = (window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
+      const ctx = new Ctx();
+      if (ctx.state === 'suspended') await ctx.resume();
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      src.connect(analyser);
+      ctxRef.current = ctx;
+      analyserRef.current = analyser;
+      setReady(true);
+      rafRef.current = requestAnimationFrame(loop);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [ready, loop]);
+
+  const arm = useCallback(() => { loudRef.current = 0; armedRef.current = true; }, []);
+  const disarm = useCallback(() => { armedRef.current = false; loudRef.current = 0; }, []);
+  const onSpeech = useCallback((cb: (() => void) | null) => { cbRef.current = cb; }, []);
+  const stopAll = useCallback(() => {
+    armedRef.current = false;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    void ctxRef.current?.close().catch(() => {});
+    ctxRef.current = null;
+    analyserRef.current = null;
+    streamRef.current = null;
+    setReady(false);
+  }, []);
+
+  useEffect(() => () => stopAll(), [stopAll]);
+  return { level, ready, ensure, arm, disarm, onSpeech, stopAll };
+}

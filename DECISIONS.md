@@ -305,3 +305,26 @@
     (and other lead fields) now fill with sample demo values via `fillDemoMerge`,
     which also strips any leftover `{{…}}` so a caller never hears a template.
     E2E updated to drive the new call UI via the type-fallback. Suite: 90 passing.
+
+## 2026-07-03 — Voice call: barge-in, cross-device, deployment-safe
+
+65. **Barge-in / interruptions.** `useMicLevel` (getUserMedia + AnalyserNode with
+    echoCancellation/noiseSuppression) runs voice-activity detection: while the
+    agent is speaking the detector is armed after a 600ms grace, and sustained
+    speech energy cancels the TTS and opens the mic — the caller can talk over the
+    agent like a real call. Echo cancellation keeps the agent's own speaker audio
+    from self-triggering. Tapping the orb also interrupts. The orb scales with the
+    live mic level.
+66. **All devices / browsers.** The call modal is mobile-first (`h-[100dvh]`
+    full-screen on phones, `sm:` card on desktop) with controls always visible.
+    Feature-detects: no SpeechRecognition (iOS Safari / Firefox) → the agent still
+    speaks and the caller types (auto-shown fallback + note); non-secure context →
+    a clear "voice needs https" note. Mic denied → degrades to tap-to-interrupt.
+67. **Deployment-safe.** CORS now allows the configured `APP_URL`, localhost, and
+    any `*.vercel.app` / `*.onrender.com` origin (incl. preview URLs) via an origin
+    callback (reflaction required with credentials) — the split web(Vercel) /
+    api(Render) setup and mobile browsers work without per-deploy tweaks.
+    `apps/web/vercel.json` already rewrites all routes to index.html so public deep
+    links (`/read/:slug`, `/portal/:kind/:token`) resolve; `render.yaml` builds/runs
+    the API with `APP_URL` for CORS. Web Speech APIs require HTTPS — satisfied by
+    Vercel/Render automatically. Suite: 90 passing.
