@@ -81,6 +81,38 @@ test.describe.serial('CloseFlow E2E', () => {
     await expect(page.getByText('Transcript').first()).toBeVisible({ timeout: 20_000 });
   });
 
+  test('voice: Agent Studio edits a per-agent config and saves', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('#email', `gate${stamp}@test.io`);
+    await page.fill('#password', 'Passw0rd!123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/');
+    await page.goto('/voice');
+    await expect(page.getByText('Agent Studio')).toBeVisible();
+    // Toggle the "Query knowledge base" tool, then save the agent config
+    await page.getByRole('button', { name: /Query knowledge base/i }).click();
+    await page.getByRole('button', { name: 'Save agent' }).click();
+    await expect(page.getByText('Saved ✓')).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('voice: Knowledge base ingests a doc and retrieval finds it', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('#email', `gate${stamp}@test.io`);
+    await page.fill('#password', 'Passw0rd!123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/');
+    await page.goto('/voice');
+    await expect(page.getByText('Knowledge base').first()).toBeVisible();
+    await page.getByPlaceholder(/Financing & pre-approval/i).fill('Commission policy');
+    await page.getByPlaceholder(/Paste anything/i).fill('Our listing commission is 2.5 percent for sellers in Miami. Buyers pay nothing. We offer a free home valuation.');
+    await page.getByRole('button', { name: /Add to knowledge base/i }).click();
+    await expect(page.getByText(/Commission policy/).first()).toBeVisible({ timeout: 10_000 });
+    // Test retrieval — the chunk text (not just the title) must surface
+    await page.getByPlaceholder(/what areas do you cover/i).fill('what is your commission?');
+    await page.locator('form', { has: page.getByPlaceholder(/what areas do you cover/i) }).getByRole('button').click();
+    await expect(page.getByText(/2\.5 percent/i).first()).toBeVisible({ timeout: 10_000 });
+  });
+
   test('voice: in-call LLM selector on the voice page persists', async ({ page }) => {
     await page.goto('/login');
     await page.fill('#email', `gate${stamp}@test.io`);

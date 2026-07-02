@@ -3,6 +3,8 @@ import { getVoiceAgent, voiceAgentForLocale, type Locale } from '@closeflow/shar
 import { logger } from '../logger.js';
 import { complianceCheck } from '../lib/compliance.js';
 import { emitAgentEvent } from '../lib/events.js';
+import { retrieve, toContextBlock } from '../lib/knowledge.js';
+import { getEffectiveAgent } from '../lib/agent-config.js';
 import { mergeFields } from '../lib/merge.js';
 import { getQueue, QUEUES } from '../lib/queue.js';
 import { sendOutbound } from '../lib/outbound.js';
@@ -38,12 +40,18 @@ export function registerVoiceCallWorker(): void {
 
     // Language-aware agent selection: honor explicit key, else locale routing.
     const locale = (lead.locale ?? 'en') as Locale;
-    const agent =
+    const baseAgent =
       getVoiceAgent(requestedKey)?.language === locale
         ? getVoiceAgent(requestedKey)!
         : requestedKey === 'speed-to-lead' && locale !== 'en'
           ? voiceAgentForLocale(locale)
           : (getVoiceAgent(requestedKey) ?? voiceAgentForLocale(locale));
+
+    // Apply the account's Agent Studio config (persona, prompt, STT/LLM/TTS,
+    // tools, attached KB) on top of the preset. baseAgent.key is always a
+    // preset, so the effective agent is never null here.
+    const agent = (await getEffectiveAgent(accountId, baseAgent.key))!;
+    const transferRule = baseAgent.transferRule;
 
     const check = await complianceCheck({ accountId, leadId, kind: 'call', bypassQuietHours: Boolean(data.test) });
     const call = await Call.create({
@@ -69,6 +77,15 @@ export function registerVoiceCallWorker(): void {
       suggestedSlot: 'tomorrow at 3 PM',
     };
 
+    // RAG: ground the agent in the account's own knowledge base, scoped to what
+    // this lead is asking about (interest/location), plus any custom persona.
+    const ragQuery = [lead.propertyInterest, lead.location, `${agent.purpose}`].filter(Boolean).join(' ');
+    const kb = await retrieve(accountId, ragQuery || 'buyer seller financing process', 4).catch(() => []);
+    const knowledge = toContextBlock(kb);
+
+    // Agent-level persona + account-wide instructions both inform the prompt.
+    const combinedPrompt = [account.voiceSystemPrompt, agent.systemPrompt].filter(Boolean).join('\n\n') || undefined;
+
     try {
       const { providerCallId } = await provider.startOutboundCall({
         callRef: String(call._id),
@@ -78,7 +95,13 @@ export function registerVoiceCallWorker(): void {
         resolvedScript: agent.script.map((line) => mergeFields(line, ctx)),
         voiceId: agent.voiceId,
         tools: agent.tools,
-        transferRule: mergeFields(agent.transferRule, ctx),
+        transferRule: mergeFields(transferRule, ctx),
+        firstMessage: mergeFields(agent.firstMessage, ctx),
+        systemPrompt: combinedPrompt,
+        knowledge: knowledge || undefined,
+        transcriber: { provider: agent.transcriberProvider, model: agent.transcriberModel },
+        model: { provider: agent.modelProvider, model: agent.modelName, temperature: agent.temperature },
+        voice: { provider: agent.voiceProvider, voiceId: agent.voiceId },
         metadata: { accountId, leadId },
       });
       call.providerCallId = providerCallId;

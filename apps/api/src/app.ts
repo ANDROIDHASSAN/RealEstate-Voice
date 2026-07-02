@@ -15,7 +15,9 @@ import { contentRouter } from './routes/content.js';
 import { conversationsRouter } from './routes/conversations.js';
 import { eventsRouter } from './routes/events.js';
 import { integrationsRouter } from './routes/integrations.js';
+import { knowledgeRouter } from './routes/knowledge.js';
 import { leadEngineRouter } from './routes/leadengine.js';
+import { voiceAgentsRouter } from './routes/voice-agents.js';
 import { leadsRouter } from './routes/leads.js';
 import { orchestratorRouter } from './routes/orchestrator.js';
 import { sequencesRouter } from './routes/sequences.js';
@@ -62,6 +64,8 @@ export function createApp(): Express {
   app.use('/events', eventsRouter);
   app.use('/assistant', assistantRouter);
   app.use('/integrations', integrationsRouter);
+  app.use('/knowledge', knowledgeRouter);
+  app.use('/voice-agents', voiceAgentsRouter);
 
   app.use((_req, res) => res.status(404).json({ error: 'not_found' }));
 

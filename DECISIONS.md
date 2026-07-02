@@ -90,3 +90,27 @@
 37. **Call-provider + in-call LLM/TTS selectors are on the Voice page** (not just
     Settings) so a demo can be configured where calls happen — pick Mock for a
     guaranteed simulated run, or a real provider to dial an actual phone.
+
+## 2026-07-02 — Knowledge base (RAG) + Vapi-style Agent Studio
+
+38. **RAG knowledge base** (`/knowledge`, `packages/integrations/src/embeddings.ts`,
+    `apps/api/src/lib/knowledge.ts`): documents are chunked (~700 chars, sentence
+    boundaries) and embedded. Embeddings default to Gemini `gemini-embedding-001`
+    via `embedContent` (this key does not serve `text-embedding-004`/batch — model
+    is overridable with `EMBEDDINGS_MODEL`), OpenAI `text-embedding-3-small` as
+    fallback. With no key, retrieval degrades to a keyword-overlap scorer — never
+    crashes. Retrieval is cosine over stored vectors; a per-account system prompt
+    lives on `Account.voiceSystemPrompt`.
+39. **Voice calls are RAG-grounded**: the worker retrieves top chunks scoped to the
+    lead's interest/location and injects them + the system prompt into the Vapi
+    assistant's systemPrompt. The mock provider cites a retrieved fact in the
+    transcript so grounding is visible without a live provider.
+40. **Voice Agent Studio** (`/voice-agents`, `apps/web/.../voice/AgentStudio.tsx`):
+    a Vapi-style builder. Agents are config-driven data — presets in
+    `@closeflow/shared` can be overridden per account, and custom agents created.
+    Each agent has: identity + first message, system prompt, transcriber (STT),
+    model (LLM) + temperature, voice (TTS), tool toggles (transfer/hangup/voicemail/
+    DTMF/send-text/query-KB/API-request/book/tag), and attached KB docs. The worker
+    resolves the effective agent (preset ⊕ override) and passes the pipeline
+    overrides through `VoiceCallRequest` to the provider. Catalog choices live in
+    `voice-studio.ts` and are validated server-side.

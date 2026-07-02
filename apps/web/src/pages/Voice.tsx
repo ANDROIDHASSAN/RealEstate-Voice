@@ -10,6 +10,8 @@ import { Card, CardDescription, CardTitle } from '../components/ui/card';
 import { Input, Label, Select } from '../components/ui/input';
 import { PageSkeleton } from '../components/ui/skeleton';
 import { EmptyState, ErrorState } from '../components/ui/states';
+import { AgentStudio } from '../components/voice/AgentStudio';
+import { KnowledgeBase } from '../components/voice/KnowledgeBase';
 import { api } from '../lib/api';
 import { cn, timeAgo } from '../lib/utils';
 
@@ -115,7 +117,7 @@ interface TestInfo {
 const CALL_STAGES = ['queued', 'ringing', 'in-progress', 'completed'];
 
 /** Live self-test: call your own number and watch the agent run end-to-end. */
-function VoiceTestCard({ agents }: { agents: AgentCfg[] }) {
+function VoiceTestCard({ agents, preselect }: { agents: AgentCfg[]; preselect?: string }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const info = useQuery({ queryKey: ['calls-test-info'], queryFn: () => api<TestInfo>('/calls/test-info') });
@@ -126,6 +128,9 @@ function VoiceTestCard({ agents }: { agents: AgentCfg[] }) {
   useEffect(() => {
     if (info.data?.defaultPhone && !phone) setPhone(info.data.defaultPhone);
   }, [info.data, phone]);
+  useEffect(() => {
+    if (preselect) setAgentKey(preselect);
+  }, [preselect]);
 
   // Share the ['calls'] cache; poll faster while a test call is in flight.
   const calls = useQuery({
@@ -243,6 +248,7 @@ const langFlag: Record<string, string> = { en: '🇺🇸', es: '🇪🇸', ar: '
 export default function Voice() {
   const { t } = useTranslation();
   const [openCall, setOpenCall] = useState<string | null>(null);
+  const [testAgent, setTestAgent] = useState<string | undefined>(undefined);
 
   const agents = useQuery({ queryKey: ['voice-agents'], queryFn: () => api<{ agents: AgentCfg[] }>('/calls/agents') });
   const calls = useQuery({
@@ -266,9 +272,18 @@ export default function Voice() {
       <PageHeader title={t('voice.title')} subtitle={t('voice.subtitle')} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <VoiceTestCard agents={agents.data?.agents ?? []} />
+        <VoiceTestCard agents={agents.data?.agents ?? []} preselect={testAgent} />
         <VoiceEngineCard />
       </div>
+
+      <AgentStudio
+        onSelectForTest={(key) => {
+          setTestAgent(key);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
+
+      <KnowledgeBase />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">

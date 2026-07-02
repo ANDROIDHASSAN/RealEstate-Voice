@@ -193,6 +193,80 @@ describe('assistant commands', () => {
   });
 });
 
+describe('knowledge base (RAG)', () => {
+  it('ingests a document into chunks and lists it', async () => {
+    const res = await request(app)
+      .post('/knowledge')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({
+        title: 'Financing FAQ',
+        content: 'We offer conventional and FHA financing. First-time buyers can put down as little as 3.5 percent. Pre-approval takes about 24 hours. We work with three preferred local lenders in Miami.',
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.chunkCount).toBeGreaterThan(0);
+    const list = await request(app).get('/knowledge').set('Authorization', `Bearer ${tokenA}`);
+    expect(list.body.docs.some((d: { title: string }) => d.title === 'Financing FAQ')).toBe(true);
+  });
+
+  it('retrieves relevant chunks for a query (keyword mode in tests)', async () => {
+    const res = await request(app)
+      .post('/knowledge/search')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ query: 'how much down payment for first-time buyers?' });
+    expect(res.status).toBe(200);
+    expect(res.body.chunks.length).toBeGreaterThan(0);
+    expect(res.body.chunks[0].text.toLowerCase()).toContain('first-time');
+  });
+
+  it('saves the account-wide voice system prompt', async () => {
+    const res = await request(app)
+      .put('/knowledge/prompt')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ systemPrompt: 'Always be warm and never pushy. Disclose recording.' });
+    expect(res.status).toBe(200);
+    expect(res.body.systemPrompt).toMatch(/warm/);
+  });
+
+  it('keeps knowledge tenant-scoped', async () => {
+    const res = await request(app).get('/knowledge').set('Authorization', `Bearer ${tokenB}`);
+    expect(res.body.docs).toHaveLength(0);
+  });
+});
+
+describe('voice agent studio', () => {
+  it('lists agents with the full builder catalog', async () => {
+    const res = await request(app).get('/voice-agents').set('Authorization', `Bearer ${tokenA}`);
+    expect(res.status).toBe(200);
+    expect(res.body.agents.length).toBeGreaterThan(0);
+    expect(res.body.catalog.tools.some((t: { value: string }) => t.value === 'queryKnowledge')).toBe(true);
+    expect(res.body.catalog.voiceProviders.length).toBeGreaterThan(0);
+  });
+
+  it('saves a per-agent override (model/voice/prompt/tools)', async () => {
+    const res = await request(app)
+      .put('/voice-agents/speed-to-lead')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ modelProvider: 'openai', modelName: 'gpt-4o', voiceProvider: '11labs', voiceId: 'sarah', systemPrompt: 'Be concise.', tools: ['bookAppointment', 'queryKnowledge', 'notATool'] });
+    expect(res.status).toBe(200);
+    expect(res.body.agent.modelName).toBe('gpt-4o');
+    expect(res.body.agent.voiceId).toBe('sarah');
+    // unknown tool filtered out
+    expect(res.body.agent.tools).not.toContain('notATool');
+    expect(res.body.agent.tools).toContain('queryKnowledge');
+  });
+
+  it('creates and deletes a custom agent', async () => {
+    const created = await request(app).post('/voice-agents').set('Authorization', `Bearer ${tokenA}`).send({ name: 'Listing Concierge' });
+    expect(created.status).toBe(201);
+    expect(created.body.agent.custom).toBe(true);
+    const key = created.body.agent.key;
+    const list = await request(app).get('/voice-agents').set('Authorization', `Bearer ${tokenA}`);
+    expect(list.body.agents.some((a: { key: string }) => a.key === key)).toBe(true);
+    const del = await request(app).delete(`/voice-agents/${key}`).set('Authorization', `Bearer ${tokenA}`);
+    expect(del.status).toBe(200);
+  });
+});
+
 describe('voice self-test', () => {
   it('exposes test-info (provider + inbound number)', async () => {
     const res = await request(app).get('/calls/test-info').set('Authorization', `Bearer ${tokenA}`);

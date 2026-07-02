@@ -11,6 +11,16 @@ export interface VoiceCallRequest {
   voiceId: string;
   tools: string[];
   transferRule: string;
+  /** Account persona/instructions appended to the agent's system prompt. */
+  systemPrompt?: string;
+  /** Retrieved knowledge-base context (RAG) the agent may cite on the call. */
+  knowledge?: string;
+  /** Opening line the agent speaks first. */
+  firstMessage?: string;
+  /** Per-agent pipeline overrides from the Agent Studio. */
+  transcriber?: { provider: string; model?: string };
+  model?: { provider: string; model?: string; temperature?: number };
+  voice?: { provider: string; voiceId?: string };
   metadata?: Record<string, string>;
 }
 

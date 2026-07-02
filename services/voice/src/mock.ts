@@ -80,6 +80,14 @@ export class MockVoiceProvider implements VoiceProvider {
         transcript.push({ role: 'lead', text: reply, ts });
         ts += 5;
       });
+      // Show RAG grounding: if the agent was given knowledge, cite a fact from it.
+      if (req.knowledge) {
+        const fact = req.knowledge.split('\n')[0]?.replace(/^-\s*\([^)]*\)\s*/, '').slice(0, 160);
+        if (fact) {
+          transcript.push({ role: 'agent', text: `From what I have on file: ${fact}`, ts });
+          ts += 6;
+        }
+      }
       const canBook = req.tools.includes('bookAppointment');
       await this.handler?.({
         callRef: req.callRef,

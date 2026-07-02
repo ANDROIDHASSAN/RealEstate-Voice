@@ -134,6 +134,22 @@ export const integrationKeysSchema = z.object({
   values: z.record(z.string().max(500)),
 });
 
+/** Knowledge base — add a document (RAG source) for the voice agent + assistant. */
+export const knowledgeDocSchema = z.object({
+  title: z.string().min(1).max(200),
+  content: z.string().min(1).max(50_000),
+  source: z.string().max(60).optional(),
+});
+
+export const knowledgeSearchSchema = z.object({
+  query: z.string().min(1).max(500),
+  k: z.number().min(1).max(10).optional(),
+});
+
+export const voicePromptSchema = z.object({
+  systemPrompt: z.string().max(4000),
+});
+
 export const orchestrateSchema = z.object({
   leadId: z.string().min(1),
   goal: z.string().min(2).max(500),

@@ -3,6 +3,7 @@ export * from './twilio.js';
 export * from './whatsapp.js';
 export * from './resend.js';
 export * from './llm.js';
+export * from './embeddings.js';
 export * from './stripe.js';
 export * from './apify.js';
 export * from './ghl.js';

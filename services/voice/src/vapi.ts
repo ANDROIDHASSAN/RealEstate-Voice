@@ -31,16 +31,29 @@ export class VapiVoiceProvider implements VoiceProvider {
       body: JSON.stringify({
         customer: { number: req.to },
         assistant: {
-          firstMessage: req.resolvedScript[0],
-          // In-call brain, voice (TTS) and transcriber (STT) are all
-          // configurable from Settings; sensible defaults keep it working.
+          firstMessage: req.firstMessage ?? req.resolvedScript[0],
+          // Per-agent config (Agent Studio) wins; account-level env is the
+          // fallback; sensible defaults keep it working with neither.
           model: {
-            provider: env('VOICE_LLM_PROVIDER', 'groq'),
-            model: env('VOICE_LLM_MODEL', 'llama-3.3-70b-versatile'),
-            systemPrompt: `You are a real-estate assistant. Follow this script:\n${req.resolvedScript.join('\n')}\nTransfer rule: ${req.transferRule}`,
+            provider: req.model?.provider ?? env('VOICE_LLM_PROVIDER', 'groq'),
+            model: req.model?.model ?? env('VOICE_LLM_MODEL', 'llama-3.3-70b-versatile'),
+            temperature: req.model?.temperature,
+            systemPrompt: [
+              'You are a real-estate assistant.',
+              req.systemPrompt ? `\nAgent instructions:\n${req.systemPrompt}` : '',
+              req.knowledge ? `\nUse ONLY these facts about the business when relevant (do not invent):\n${req.knowledge}` : '',
+              `\nFollow this script:\n${req.resolvedScript.join('\n')}`,
+              `\nTransfer rule: ${req.transferRule}`,
+            ].join(''),
           },
-          voice: { provider: env('VOICE_TTS_PROVIDER', '11labs'), voiceId: env('VOICE_TTS_VOICE', req.voiceId) },
-          transcriber: { provider: env('VOICE_STT_PROVIDER', 'deepgram') },
+          voice: {
+            provider: req.voice?.provider ?? env('VOICE_TTS_PROVIDER', '11labs'),
+            voiceId: req.voice?.voiceId ?? env('VOICE_TTS_VOICE', req.voiceId),
+          },
+          transcriber: {
+            provider: req.transcriber?.provider ?? env('VOICE_STT_PROVIDER', 'deepgram'),
+            ...(req.transcriber?.model ? { model: req.transcriber.model } : {}),
+          },
         },
         metadata: { ...req.metadata, callRef: req.callRef },
       }),

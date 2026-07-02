@@ -21,6 +21,8 @@ const accountSchema = new Schema(
     websiteSlug: { type: String, index: true, sparse: true, unique: true },
     ownerName: String,
     status: { type: String, enum: ['active', 'past_due', 'canceled'], default: 'active' },
+    /** Custom instructions injected into every voice agent's system prompt. */
+    voiceSystemPrompt: String,
   },
   { timestamps: true },
 );
@@ -252,6 +254,23 @@ const videoJobSchema = new Schema(
 );
 
 /**
+ * Knowledge base for RAG — per account. Each document is split into chunks;
+ * when an embeddings key is set, each chunk carries a vector for semantic
+ * search, otherwise retrieval falls back to keyword scoring over `text`.
+ */
+const knowledgeDocSchema = new Schema(
+  {
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
+    title: { type: String, required: true },
+    source: { type: String, default: 'manual' },
+    chunkCount: { type: Number, default: 0 },
+    embedded: { type: Boolean, default: false },
+    chunks: [{ text: String, embedding: { type: [Number], default: undefined }, _id: false }],
+  },
+  { timestamps: true },
+);
+
+/**
  * Per-account provider credentials configured from Settings. Values are
  * stored server-side only and always masked in API responses. On boot (and
  * on save) they are applied to process.env so integration clients pick them
@@ -285,4 +304,37 @@ export const UsageLedger = model('UsageLedger', usageLedgerSchema);
 export const Compliance = model('Compliance', complianceSchema);
 export const ScrapeJob = model('ScrapeJob', scrapeJobSchema);
 export const VideoJob = model('VideoJob', videoJobSchema);
+/**
+ * Per-account voice-agent configuration — a Vapi-style builder. Overrides a
+ * preset (by key) or defines a fully custom agent (custom:true). Every field
+ * the studio exposes lives here: identity, first message, system prompt, the
+ * transcriber (STT), model (LLM), voice (TTS), tools, and attached KB docs.
+ */
+const voiceAgentConfigSchema = new Schema(
+  {
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
+    key: { type: String, required: true },
+    custom: { type: Boolean, default: false },
+    enabled: { type: Boolean, default: true },
+    name: String,
+    language: { type: String, enum: ['en', 'es', 'ar', 'pt', 'ht'], default: 'en' },
+    purpose: String,
+    firstMessage: String,
+    systemPrompt: String,
+    transcriberProvider: String,
+    transcriberModel: String,
+    modelProvider: String,
+    modelName: String,
+    temperature: { type: Number, min: 0, max: 2, default: 0.5 },
+    voiceProvider: String,
+    voiceId: String,
+    tools: { type: [String], default: undefined },
+    knowledgeDocIds: { type: [Schema.Types.ObjectId], default: [] },
+  },
+  { timestamps: true },
+);
+voiceAgentConfigSchema.index({ accountId: 1, key: 1 }, { unique: true });
+
 export const IntegrationSetting = model('IntegrationSetting', integrationSettingSchema);
+export const KnowledgeDoc = model('KnowledgeDoc', knowledgeDocSchema);
+export const VoiceAgentConfig = model('VoiceAgentConfig', voiceAgentConfigSchema);
