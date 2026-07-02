@@ -25,10 +25,19 @@ export class VapiVoiceProvider implements VoiceProvider {
   }
 
   async startOutboundCall(req: VoiceCallRequest): Promise<{ providerCallId: string }> {
+    // Vapi requires the number to dial FROM (a phone number you created/imported
+    // in the Vapi dashboard). Without it Vapi rejects the call with 400.
+    const phoneNumberId = env('VAPI_PHONE_NUMBER_ID', '');
+    if (!phoneNumberId) {
+      throw new Error(
+        'no Vapi phone number set. In the Vapi dashboard create/import a phone number, then paste its ID as VAPI_PHONE_NUMBER_ID in Settings → Voice.',
+      );
+    }
     const res = await fetch('https://api.vapi.ai/call', {
       method: 'POST',
       headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        phoneNumberId,
         customer: { number: req.to },
         assistant: {
           firstMessage: req.firstMessage ?? req.resolvedScript[0],
@@ -58,7 +67,13 @@ export class VapiVoiceProvider implements VoiceProvider {
         metadata: { ...req.metadata, callRef: req.callRef },
       }),
     });
-    if (!res.ok) throw new Error(`Vapi HTTP ${res.status}`);
+    if (!res.ok) {
+      // Surface Vapi's actual message (bad key, missing number, unverified
+      // destination…) so the UI shows what to fix, not just a status code.
+      const body = await res.text().catch(() => '');
+      const detail = body ? `: ${body.replace(/\s+/g, ' ').slice(0, 220)}` : '';
+      throw new Error(`Vapi HTTP ${res.status}${detail}`);
+    }
     const data = (await res.json()) as { id: string };
     return { providerCallId: data.id };
   }

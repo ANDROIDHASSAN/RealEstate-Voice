@@ -162,7 +162,8 @@ export const PROVIDER_CATALOG: ProviderDef[] = [
     name: 'Voice provider (Vapi / Dograh)',
     docsUrl: 'https://dashboard.vapi.ai',
     fields: [
-      { var: 'VAPI_API_KEY', label: 'Vapi API key', secret: true },
+      { var: 'VAPI_API_KEY', label: 'Vapi private API key', secret: true },
+      { var: 'VAPI_PHONE_NUMBER_ID', label: 'Vapi phone number ID (to call from)', secret: false },
       { var: 'DOGRAH_BASE_URL', label: 'Dograh self-hosted URL', secret: false },
       { var: 'DOGRAH_API_KEY', label: 'Dograh API key', secret: true },
       { var: 'VOICE_TTS_VOICE', label: 'Voice ID (TTS voice)', secret: false },
