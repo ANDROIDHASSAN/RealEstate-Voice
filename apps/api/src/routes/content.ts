@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
-import { contentPostSchema, generateCaptionSchema } from '@closeflow/shared';
-import { getLLM, instagram, video } from '@closeflow/integrations';
+import { contentPostSchema, generateCaptionSchema } from '@truecode/shared';
+import { getLLM, instagram, video } from '@truecode/integrations';
 import { z } from 'zod';
 import { requireAuth, requireModule } from '../middleware/auth.js';
 import { getQueue, QUEUES } from '../lib/queue.js';

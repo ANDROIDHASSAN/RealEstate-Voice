@@ -294,6 +294,22 @@ describe('voice agent studio', () => {
     expect(res.body.agent.tools).toContain('queryKnowledge');
   });
 
+  it('browser demo: agent greets first, then replies to a message', async () => {
+    const first = await request(app)
+      .post('/voice-agents/speed-to-lead/demo')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ messages: [] });
+    expect(first.status).toBe(200);
+    expect(first.body.reply.length).toBeGreaterThan(0);
+    const reply = await request(app)
+      .post('/voice-agents/speed-to-lead/demo')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ messages: [{ role: 'agent', text: first.body.reply }, { role: 'user', text: "Hi, I'm looking to buy a condo in Brickell." }] });
+    expect(reply.status).toBe(200);
+    expect(typeof reply.body.reply).toBe('string');
+    expect(reply.body.reply.length).toBeGreaterThan(0);
+  });
+
   it('creates and deletes a custom agent', async () => {
     const created = await request(app).post('/voice-agents').set('Authorization', `Bearer ${tokenA}`).send({ name: 'Listing Concierge' });
     expect(created.status).toBe(201);

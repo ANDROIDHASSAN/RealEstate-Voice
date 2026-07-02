@@ -1,4 +1,4 @@
-# CloseFlow OS
+# TrueCode AI OS
 
 **The operating system a real estate agent runs their whole business on.** Captures leads, replies in under 60 seconds, qualifies and books by AI voice, follows up across SMS/WhatsApp/email forever, runs their content — one beautiful pastel dashboard, five languages (en · es · ar · pt · ht), full RTL.
 
@@ -13,7 +13,7 @@
 npm install
 npm run dev          # api :4100 + web :5173 (in-memory Mongo/queue when no env keys)
 npm run seed         # demo account — or POST /auth/seed-demo on a running dev API
-# login: demo@closeflow.io / Demo1234!
+# login: demo@truecode.ai / Demo1234!
 ```
 
 ## Tests (all green)

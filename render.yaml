@@ -2,7 +2,7 @@
 # after 15 min idle; /health + an external keep-warm ping (cron-job.org) mitigate.
 services:
   - type: web
-    name: closeflow-api
+    name: truecode-api
     runtime: node
     plan: free
     buildCommand: npm ci && npm run build -w packages/shared && npm run build -w packages/integrations && npm run build -w services/voice && npm run build -w apps/api
@@ -26,7 +26,7 @@ services:
       - key: AGENTS_SERVICE_URL
         fromService:
           type: web
-          name: closeflow-agents
+          name: TrueCode AI-agents
           envVarKey: RENDER_EXTERNAL_URL
       - key: ALLOW_DEMO_SEED
         value: "1"
@@ -52,7 +52,7 @@ services:
         sync: false
 
   - type: web
-    name: closeflow-agents
+    name: TrueCode AI-agents
     runtime: python
     plan: free
     rootDir: services/agents

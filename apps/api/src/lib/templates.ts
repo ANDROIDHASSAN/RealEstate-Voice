@@ -1,4 +1,4 @@
-import type { Locale } from '@closeflow/shared';
+import type { Locale } from '@truecode/shared';
 
 /** Localized outbound templates. Lead locale drives channel language (§8). */
 export const TEMPLATES: Record<

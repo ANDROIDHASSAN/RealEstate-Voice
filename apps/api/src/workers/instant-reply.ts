@@ -1,4 +1,4 @@
-import type { Locale } from '@closeflow/shared';
+import type { Locale } from '@truecode/shared';
 import { logger } from '../logger.js';
 import { emitAgentEvent } from '../lib/events.js';
 import { mergeFields } from '../lib/merge.js';

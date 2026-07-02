@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { leadWebhookSchema, type Locale } from '@closeflow/shared';
+import { leadWebhookSchema, type Locale } from '@truecode/shared';
 import mongoose from 'mongoose';
 import { logger } from '../logger.js';
 import { handleOptOut } from '../lib/compliance.js';

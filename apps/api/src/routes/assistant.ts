@@ -5,8 +5,8 @@ import {
   buildPersonaQuery,
   getLeadPersona,
   LEAD_PERSONAS,
-} from '@closeflow/shared';
-import { getLLM } from '@closeflow/integrations';
+} from '@truecode/shared';
+import { getLLM } from '@truecode/integrations';
 import { logger } from '../logger.js';
 import { requireAuth } from '../middleware/auth.js';
 import { emitAgentEvent } from '../lib/events.js';
@@ -15,7 +15,7 @@ import { sendOutbound } from '../lib/outbound.js';
 import { Account, Appointment, Lead, ScrapeJob } from '../models.js';
 
 /**
- * CloseFlow Assistant — one natural-language command (typed or voice) in, a
+ * TrueCode AI Assistant — one natural-language command (typed or voice) in, a
  * multi-step, auditable PLAN out. The LLM only plans (closed, Zod-validated
  * action set) with a live snapshot of the account (leads, stats, modules) as
  * context; Node EXECUTES each step through the same gated paths as the UI
@@ -202,7 +202,7 @@ async function planWithLLM(text: string, context: AssistantContext, locale: stri
         temperature: 0.2,
         maxTokens: 900,
         system: [
-          'You are the CloseFlow OS command router + copilot for a real-estate AI platform.',
+          'You are the TrueCode AI OS command router + copilot for a real-estate AI platform.',
           `Reply text must be written in locale "${locale}".`,
           'You receive a USER COMMAND and an ACCOUNT CONTEXT snapshot (plan, enabled modules, lead counts, recent named leads with ids, recent scrapes, stats).',
           'Decompose the command into an ORDERED PLAN of one or more steps and return ONLY JSON:',

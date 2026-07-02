@@ -1,4 +1,4 @@
-# CloseFlow OS — build rules
+# TrueCode AI OS — build rules
 
 - Build in PHASE ORDER (see PROMPT §18). App must boot + phase acceptance test pass before next phase.
 - Every module gated by `requireModule(flag)`. Every DB query scoped by `accountId` (multi-tenant isolation).
@@ -19,7 +19,7 @@
 - `npm run build` — builds shared, api, web.
 - `npm run test` — API integration tests (vitest + supertest).
 - `npm run e2e` — Playwright E2E (starts servers itself).
-- `npm run seed` — seeds the demo Empire account (demo@closeflow.io / Demo1234!).
+- `npm run seed` — seeds the demo Empire account (demo@truecode.ai / Demo1234!).
 
 ## Layout
 - `apps/web` React 18 + Vite + TS + Tailwind (tokens) + TanStack Query + Zustand + react-i18next + Recharts.

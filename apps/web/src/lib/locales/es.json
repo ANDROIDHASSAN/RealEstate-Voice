@@ -34,7 +34,16 @@
     "search": "Buscar leads…",
     "empty": "Aún no hay leads",
     "emptyHint": "Conecta tus formularios de Zillow, Facebook y tu web al webhook de entrada — cada lead nuevo recibe respuesta instantánea.",
-    "status": { "new": "Nuevo", "contacted": "Contactado", "qualified": "Calificado", "appointment": "Cita", "nurture": "Nutrición", "won": "Ganado", "lost": "Perdido", "dnc": "No contactar" },
+    "status": {
+      "new": "Nuevo",
+      "contacted": "Contactado",
+      "qualified": "Calificado",
+      "appointment": "Cita",
+      "nurture": "Nutrición",
+      "won": "Ganado",
+      "lost": "Perdido",
+      "dnc": "No contactar"
+    },
     "firstResponse": "Primera respuesta",
     "source": "Fuente",
     "score": "Puntaje",
@@ -93,6 +102,7 @@
     "results": "Mejores coincidencias"
   },
   "voice": {
+    "tryInBrowser": "Habla con este agente en el navegador (sin teléfono)",
     "title": "Agentes de voz",
     "subtitle": "Tu equipo de llamadas multilingüe 24/7",
     "engine": "Motor de voz",
@@ -210,7 +220,7 @@
     "language": "Idioma del panel"
   },
   "assistant": {
-    "title": "Asistente CloseFlow",
+    "title": "Asistente TrueCode AI",
     "subtitle": "Escribe o habla — tus agentes hacen el trabajo",
     "snapshot": "Estoy siguiendo tu cuenta: {{total}} contactos en total, {{week}} nuevos esta semana, {{appts}} citas agendadas. Pregúntame lo que quieras.",
     "intro": "Dime qué quieres hacer — lo enviaré al agente correcto y podrás verlo suceder en vivo.",
@@ -228,13 +238,34 @@
     "done": "¡Vamos!",
     "showMe": "Muéstrame",
     "replay": "Repetir el tour",
-    "welcome": { "title": "Bienvenido a CloseFlow OS", "body": "Imagínalo como un equipo de ayudantes robot incansables para tu negocio inmobiliario. Responden leads, hacen llamadas, dan seguimiento y encuentran nuevos clientes — mientras tú lo ves todo en vivo." },
-    "leads": { "title": "Cada lead respondido en segundos", "body": "Cuando alguien pregunta por una casa, tu robot responde al instante por mensaje — de día o de noche. Las respuestas rápidas ganan negocios." },
-    "voice": { "title": "IA que habla por teléfono", "body": "Tus agentes de voz llaman a los leads nuevos, hacen las preguntas correctas y agendan citas — en 5 idiomas. Tú recibes la transcripción." },
-    "leadEngine": { "title": "Encuentra nuevos clientes bajo demanda", "body": "Elige a quién quieres (compradores de lujo, vendedores FSBO, inversores…), elige una ciudad y pulsa iniciar. Prospectos frescos entran a tu pipeline." },
-    "agents": { "title": "Mira trabajar a tu equipo IA", "body": "Esta página muestra cada agente y lo que está haciendo ahora mismo — verde brillante significa que está trabajando. Dale una meta al equipo y míralos decidir." },
-    "assistant": { "title": "Solo di lo que quieres", "body": "Pulsa el botón de destello (o Alt+K) y escribe — o toca el micrófono y habla. \"Llama a Maria\", \"busca inversores en Dubái\", \"ve a ajustes\". Listo." },
-    "keys": { "title": "Conecta tus cuentas", "body": "En Ajustes, pega las claves API de Twilio, WhatsApp y más. ¿Aún sin claves? Todo funciona en modo de prueba seguro para que explores." }
+    "welcome": {
+      "title": "Bienvenido a TrueCode AI OS",
+      "body": "Imagínalo como un equipo de ayudantes robot incansables para tu negocio inmobiliario. Responden leads, hacen llamadas, dan seguimiento y encuentran nuevos clientes — mientras tú lo ves todo en vivo."
+    },
+    "leads": {
+      "title": "Cada lead respondido en segundos",
+      "body": "Cuando alguien pregunta por una casa, tu robot responde al instante por mensaje — de día o de noche. Las respuestas rápidas ganan negocios."
+    },
+    "voice": {
+      "title": "IA que habla por teléfono",
+      "body": "Tus agentes de voz llaman a los leads nuevos, hacen las preguntas correctas y agendan citas — en 5 idiomas. Tú recibes la transcripción."
+    },
+    "leadEngine": {
+      "title": "Encuentra nuevos clientes bajo demanda",
+      "body": "Elige a quién quieres (compradores de lujo, vendedores FSBO, inversores…), elige una ciudad y pulsa iniciar. Prospectos frescos entran a tu pipeline."
+    },
+    "agents": {
+      "title": "Mira trabajar a tu equipo IA",
+      "body": "Esta página muestra cada agente y lo que está haciendo ahora mismo — verde brillante significa que está trabajando. Dale una meta al equipo y míralos decidir."
+    },
+    "assistant": {
+      "title": "Solo di lo que quieres",
+      "body": "Pulsa el botón de destello (o Alt+K) y escribe — o toca el micrófono y habla. \"Llama a Maria\", \"busca inversores en Dubái\", \"ve a ajustes\". Listo."
+    },
+    "keys": {
+      "title": "Conecta tus cuentas",
+      "body": "En Ajustes, pega las claves API de Twilio, WhatsApp y más. ¿Aún sin claves? Todo funciona en modo de prueba seguro para que explores."
+    }
   },
   "auth": {
     "login": "Iniciar sesión",
@@ -259,5 +290,14 @@
     "lockedHint": "Este módulo no está en tu plan actual.",
     "upgradeCta": "Ver planes",
     "mock": "Modo de prueba"
+  },
+  "demo": {
+    "onCall": "En llamada — demo en vivo",
+    "speak": "Leer respuestas en voz alta",
+    "hangUp": "Finalizar demo",
+    "hold": "Toca para hablar",
+    "say": "Escribe tu respuesta o toca el micrófono…",
+    "noMic": "La entrada por voz no es compatible con este navegador — escribe.",
+    "badge": "Demo en el navegador · sin teléfono"
   }
 }

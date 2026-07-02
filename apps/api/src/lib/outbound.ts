@@ -1,5 +1,5 @@
-import { resend, twilio, whatsapp } from '@closeflow/integrations';
-import type { Channel } from '@closeflow/shared';
+import { resend, twilio, whatsapp } from '@truecode/integrations';
+import type { Channel } from '@truecode/shared';
 import { logger } from '../logger.js';
 import { Conversation, Lead, UsageLedger } from '../models.js';
 import { complianceCheck, type OutboundKind } from './compliance.js';

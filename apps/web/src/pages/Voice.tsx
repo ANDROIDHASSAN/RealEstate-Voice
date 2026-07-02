@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Cpu, Phone, PhoneCall, PhoneOutgoing, Sparkles } from 'lucide-react';
+import { Cpu, MessageSquare, Phone, PhoneCall, PhoneOutgoing, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
@@ -10,6 +10,7 @@ import { Card, CardDescription, CardTitle } from '../components/ui/card';
 import { Input, Label, Select } from '../components/ui/input';
 import { PageSkeleton } from '../components/ui/skeleton';
 import { EmptyState, ErrorState } from '../components/ui/states';
+import { AgentDemo } from '../components/voice/AgentDemo';
 import { AgentStudio } from '../components/voice/AgentStudio';
 import { KnowledgeBase } from '../components/voice/KnowledgeBase';
 import { api } from '../lib/api';
@@ -117,7 +118,7 @@ interface TestInfo {
 const CALL_STAGES = ['queued', 'ringing', 'in-progress', 'completed'];
 
 /** Live self-test: call your own number and watch the agent run end-to-end. */
-function VoiceTestCard({ agents, preselect }: { agents: AgentCfg[]; preselect?: string }) {
+function VoiceTestCard({ agents, preselect, onDemo }: { agents: AgentCfg[]; preselect?: string; onDemo: (key: string, name: string) => void }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const info = useQuery({ queryKey: ['calls-test-info'], queryFn: () => api<TestInfo>('/calls/test-info') });
@@ -195,6 +196,15 @@ function VoiceTestCard({ agents, preselect }: { agents: AgentCfg[]; preselect?: 
         </Button>
       </form>
 
+      {/* Browser demo — no phone needed */}
+      <button
+        type="button"
+        onClick={() => onDemo(agentKey, agents.find((a) => a.key === agentKey)?.name ?? agentKey)}
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-pill bg-accent/5 px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-card-purple"
+      >
+        <MessageSquare className="h-4 w-4" /> {t('voice.tryInBrowser')}
+      </button>
+
       {info.data && (
         <p className="mt-3 text-xs text-ink-soft">
           {info.data.inboundNumber
@@ -249,6 +259,7 @@ export default function Voice() {
   const { t } = useTranslation();
   const [openCall, setOpenCall] = useState<string | null>(null);
   const [testAgent, setTestAgent] = useState<string | undefined>(undefined);
+  const [demoAgent, setDemoAgent] = useState<{ key: string; name: string } | null>(null);
 
   const agents = useQuery({ queryKey: ['voice-agents'], queryFn: () => api<{ agents: AgentCfg[] }>('/calls/agents') });
   const calls = useQuery({
@@ -272,7 +283,11 @@ export default function Voice() {
       <PageHeader title={t('voice.title')} subtitle={t('voice.subtitle')} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <VoiceTestCard agents={agents.data?.agents ?? []} preselect={testAgent} />
+        <VoiceTestCard
+          agents={agents.data?.agents ?? []}
+          preselect={testAgent}
+          onDemo={(key, name) => setDemoAgent({ key, name })}
+        />
         <VoiceEngineCard />
       </div>
 
@@ -281,9 +296,12 @@ export default function Voice() {
           setTestAgent(key);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
+        onDemo={(key, name) => setDemoAgent({ key, name })}
       />
 
       <KnowledgeBase />
+
+      {demoAgent && <AgentDemo agentKey={demoAgent.key} agentName={demoAgent.name} onClose={() => setDemoAgent(null)} />}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">

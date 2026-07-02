@@ -34,7 +34,16 @@
     "search": "Chèche…",
     "empty": "Poko gen kliyan",
     "emptyHint": "Konekte fòm Zillow, Facebook ak sit ou a sou webhook la — chak nouvo kliyan ap jwenn repons otomatik.",
-    "status": { "new": "Nouvo", "contacted": "Kontakte", "qualified": "Kalifye", "appointment": "Randevou", "nurture": "Swivi", "won": "Genyen", "lost": "Pèdi", "dnc": "Pa kontakte" },
+    "status": {
+      "new": "Nouvo",
+      "contacted": "Kontakte",
+      "qualified": "Kalifye",
+      "appointment": "Randevou",
+      "nurture": "Swivi",
+      "won": "Genyen",
+      "lost": "Pèdi",
+      "dnc": "Pa kontakte"
+    },
     "firstResponse": "Premye repons",
     "source": "Sous",
     "score": "Nòt",
@@ -93,6 +102,7 @@
     "results": "Pi bon rezilta yo"
   },
   "voice": {
+    "tryInBrowser": "Pale ak ajan sa a nan navigatè a (san telefòn)",
     "title": "Ajan vwa",
     "subtitle": "Ekip apèl milti-lang ou 24/7",
     "engine": "Motè vwa",
@@ -210,7 +220,7 @@
     "language": "Lang tablo a"
   },
   "assistant": {
-    "title": "Asistan CloseFlow",
+    "title": "Asistan TrueCode AI",
     "subtitle": "Tape oswa pale — ajan ou yo fè travay la",
     "snapshot": "M ap swiv kont ou: {{total}} kliyan antou, {{week}} nouvo semèn sa a, {{appts}} randevou pran. Mande m nenpòt bagay sou li.",
     "intro": "Di m sa ou vle fèt — m ap voye l bay bon ajan an epi ou ka gade l ap fèt an dirèk.",
@@ -228,13 +238,34 @@
     "done": "Ann ale!",
     "showMe": "Montre m",
     "replay": "Rejwe vizit la",
-    "welcome": { "title": "Byenveni nan CloseFlow OS", "body": "Panse ak li tankou yon ekip èd robo ki pa janm fatige pou biznis imobilye ou. Yo reponn kliyan, fè apèl, fè swivi epi jwenn nouvo kliyan — pandan w ap gade tout bagay an dirèk." },
-    "leads": { "title": "Chak kliyan jwenn repons nan segonn", "body": "Lè yon moun mande sou yon kay, robo ou a reponn imedyatman pa mesaj — lajounen kou lannwit. Repons rapid genyen afè." },
-    "voice": { "title": "IA ki pale nan telefòn", "body": "Ajan vwa ou yo rele nouvo kliyan, poze bon kesyon yo epi pwograme randevou — nan 5 lang. Ou resevwa transkripsyon an." },
-    "leadEngine": { "title": "Jwenn nouvo kliyan sou demann", "body": "Chwazi ki moun ou vle (achtè liks, vandè FSBO, envestisè…), chwazi yon vil, peze ale. Nouvo pwospè ap antre nan pipeline ou." },
-    "agents": { "title": "Gade ekip IA ou a k ap travay", "body": "Paj sa a montre chak ajan ak sa l ap fè kounye a — vèt klere vle di l ap travay. Bay ekip la yon objektif epi gade yo deside." },
-    "assistant": { "title": "Sèlman di sa ou vle", "body": "Peze bouton etensèl la (oswa Alt+K) epi tape — oswa manyen mikwo a epi pale. \"Rele Maria\", \"jwenn envestisè nan Dubai\", \"ale nan paramèt\". Fini." },
-    "keys": { "title": "Konekte kont ou yo", "body": "Nan Paramèt, kole kle API pou Twilio, WhatsApp ak plis ankò. Poko gen kle? Tout bagay toujou mache an mòd tès san danje pou ou ka eksplore." }
+    "welcome": {
+      "title": "Byenveni nan TrueCode AI OS",
+      "body": "Panse ak li tankou yon ekip èd robo ki pa janm fatige pou biznis imobilye ou. Yo reponn kliyan, fè apèl, fè swivi epi jwenn nouvo kliyan — pandan w ap gade tout bagay an dirèk."
+    },
+    "leads": {
+      "title": "Chak kliyan jwenn repons nan segonn",
+      "body": "Lè yon moun mande sou yon kay, robo ou a reponn imedyatman pa mesaj — lajounen kou lannwit. Repons rapid genyen afè."
+    },
+    "voice": {
+      "title": "IA ki pale nan telefòn",
+      "body": "Ajan vwa ou yo rele nouvo kliyan, poze bon kesyon yo epi pwograme randevou — nan 5 lang. Ou resevwa transkripsyon an."
+    },
+    "leadEngine": {
+      "title": "Jwenn nouvo kliyan sou demann",
+      "body": "Chwazi ki moun ou vle (achtè liks, vandè FSBO, envestisè…), chwazi yon vil, peze ale. Nouvo pwospè ap antre nan pipeline ou."
+    },
+    "agents": {
+      "title": "Gade ekip IA ou a k ap travay",
+      "body": "Paj sa a montre chak ajan ak sa l ap fè kounye a — vèt klere vle di l ap travay. Bay ekip la yon objektif epi gade yo deside."
+    },
+    "assistant": {
+      "title": "Sèlman di sa ou vle",
+      "body": "Peze bouton etensèl la (oswa Alt+K) epi tape — oswa manyen mikwo a epi pale. \"Rele Maria\", \"jwenn envestisè nan Dubai\", \"ale nan paramèt\". Fini."
+    },
+    "keys": {
+      "title": "Konekte kont ou yo",
+      "body": "Nan Paramèt, kole kle API pou Twilio, WhatsApp ak plis ankò. Poko gen kle? Tout bagay toujou mache an mòd tès san danje pou ou ka eksplore."
+    }
   },
   "auth": {
     "login": "Konekte",
@@ -259,5 +290,14 @@
     "lockedHint": "Modil sa a pa nan plan aktyèl ou.",
     "upgradeCta": "Wè plan yo",
     "mock": "Mòd tès"
+  },
+  "demo": {
+    "onCall": "Nan apèl — demo an dirèk",
+    "speak": "Li repons yo awotvwa",
+    "hangUp": "Fini demo a",
+    "hold": "Peze pou pale",
+    "say": "Tape repons ou oswa peze mikwo a…",
+    "noMic": "Antre vwa pa sipòte nan navigatè sa a — tape.",
+    "badge": "Demo nan navigatè · san telefòn"
   }
 }

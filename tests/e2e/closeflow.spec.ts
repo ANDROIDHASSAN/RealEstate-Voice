@@ -13,7 +13,7 @@ async function signupViaUi(page: Page, email: string) {
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Eve', { timeout: 15_000 });
 }
 
-test.describe.serial('CloseFlow E2E', () => {
+test.describe.serial('TrueCode AI E2E', () => {
   const email = `e2e${stamp}@test.io`;
 
   // The first-login tour overlay would intercept clicks — mark as onboarded
@@ -79,6 +79,21 @@ test.describe.serial('CloseFlow E2E', () => {
     await page.getByRole('button', { name: /Call me now/i }).click();
     // Mock provider drives the call to completion; transcript renders when done
     await expect(page.getByText('Transcript').first()).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('voice: browser demo — talk to an agent with no phone', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('#email', `gate${stamp}@test.io`);
+    await page.fill('#password', 'Passw0rd!123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/');
+    await page.goto('/voice');
+    await page.getByRole('button', { name: /Talk to this agent in the browser/i }).click();
+    await expect(page.getByText(/Browser demo · no phone/i)).toBeVisible();
+    await page.getByPlaceholder(/Type your reply/i).fill('I want to buy a condo in Brickell');
+    await page.getByPlaceholder(/Type your reply/i).press('Enter');
+    await expect(page.getByText('I want to buy a condo in Brickell')).toBeVisible();
+    await expect(page.getByText(/book|help|team|great|market/i).first()).toBeVisible({ timeout: 15_000 });
   });
 
   test('voice: Agent Studio edits a per-agent config and saves', async ({ page }) => {
@@ -169,10 +184,10 @@ test.describe.serial('CloseFlow E2E', () => {
     await page.fill('#email', email);
     await page.fill('#password', 'Passw0rd!123');
     await page.click('button[type="submit"]');
-    await expect(page.getByText('Welcome to CloseFlow OS')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Welcome to TrueCode AI OS')).toBeVisible({ timeout: 15_000 });
     // Skip closes the tour and persists the flag
     await page.getByTitle('Skip').click();
-    await expect(page.getByText('Welcome to CloseFlow OS')).not.toBeVisible();
+    await expect(page.getByText('Welcome to TrueCode AI OS')).not.toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem('cf-onboarded'))).toBe('1');
   });
 
@@ -182,7 +197,7 @@ test.describe.serial('CloseFlow E2E', () => {
     await page.fill('#password', 'Passw0rd!123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/');
-    await page.getByTitle(/CloseFlow Assistant/).click();
+    await page.getByTitle(/TrueCode AI Assistant/).click();
     await page.getByPlaceholder(/Type a command/).fill('go to leads');
     await page.keyboard.press('Enter');
     await page.waitForURL('**/leads', { timeout: 15_000 });

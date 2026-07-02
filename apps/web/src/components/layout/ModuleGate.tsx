@@ -1,7 +1,7 @@
 import { Lock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { PLANS } from '@closeflow/shared';
+import { PLANS } from '@truecode/shared';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { hasModule, useAuthStore } from '../../store/auth';

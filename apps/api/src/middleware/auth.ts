@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import type { ModuleFlag } from '@closeflow/shared';
+import type { ModuleFlag } from '@truecode/shared';
 import { env } from '../env.js';
 import { Account } from '../models.js';
 

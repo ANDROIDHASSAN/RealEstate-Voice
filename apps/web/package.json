@@ -1,5 +1,5 @@
 {
-  "name": "@closeflow/web",
+  "name": "@truecode/web",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@closeflow/shared": "*",
+    "@truecode/shared": "*",
     "@tanstack/react-query": "^5.62.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

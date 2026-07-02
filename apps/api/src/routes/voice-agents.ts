@@ -8,15 +8,19 @@ import {
   STT_PROVIDERS,
   TTS_PROVIDERS,
   TTS_VOICES,
-} from '@closeflow/shared';
+} from '@truecode/shared';
 import { z } from 'zod';
+import { getLLM } from '@truecode/integrations';
 import { requireAuth, requireModule } from '../middleware/auth.js';
 import { getEffectiveAgent, listEffectiveAgents } from '../lib/agent-config.js';
-import { KnowledgeDoc, VoiceAgentConfig } from '../models.js';
+import { retrieve, toContextBlock } from '../lib/knowledge.js';
+import { Account, KnowledgeDoc, VoiceAgentConfig } from '../models.js';
+
+const LANG_NAME: Record<string, string> = { en: 'English', es: 'Spanish', ar: 'Arabic', pt: 'Portuguese', ht: 'Haitian Creole' };
 
 /**
  * Voice Agent Studio — CRUD for per-account agent configs (a Vapi-style
- * builder). Agents are config-driven data: presets shipped in @closeflow/shared
+ * builder). Agents are config-driven data: presets shipped in @truecode/shared
  * can be overridden per account, and brand-new custom agents can be created.
  */
 export const voiceAgentsRouter = Router();
@@ -88,6 +92,73 @@ voiceAgentsRouter.put('/:key', async (req: Request, res: Response) => {
   if (!agent) return res.status(404).json({ error: 'not_found' });
   return res.json({ agent });
 });
+
+const demoSchema = z.object({
+  messages: z.array(z.object({ role: z.enum(['user', 'agent']), text: z.string().max(2000) })).max(40).default([]),
+});
+
+/**
+ * Browser demo — talk to an agent from the laptop, no phone/Vapi needed.
+ * Uses the agent's effective config (persona, first message, model, language)
+ * + the account system prompt + RAG knowledge for grounded, in-character
+ * replies. Falls back to a template reply when no LLM key is set.
+ */
+voiceAgentsRouter.post('/:key/demo', async (req: Request, res: Response) => {
+  const parsed = demoSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'invalid_input' });
+  const accountId = req.auth!.accountId;
+  const agent = await getEffectiveAgent(accountId, String(req.params.key));
+  if (!agent) return res.status(404).json({ error: 'agent_not_found' });
+
+  const account = await Account.findById(accountId).select('name ownerName voiceSystemPrompt').lean();
+  const history = parsed.data.messages;
+
+  // Opening line: if the conversation is empty, the agent speaks first.
+  if (history.length === 0) {
+    const first = (agent.firstMessage || 'Hi, thanks for taking my call!')
+      .replace(/\{\{account\.name\}\}/g, account?.name ?? 'our team')
+      .replace(/\{\{account\.ownerName\}\}/g, account?.ownerName ?? account?.name ?? 'your agent')
+      .replace(/\{\{lead\.firstName\}\}/g, 'there');
+    return res.json({ reply: first, grounded: false });
+  }
+
+  const lastUser = [...history].reverse().find((m) => m.role === 'user')?.text ?? '';
+  const kb = await retrieve(accountId, lastUser || agent.purpose, 4).catch(() => []);
+  const knowledge = toContextBlock(kb);
+  const llm = getLLM();
+
+  const system = [
+    `You are ${agent.name}, a real-estate voice agent for ${account?.name ?? 'the business'}.`,
+    agent.systemPrompt ? `\nAgent instructions:\n${agent.systemPrompt}` : `\nGoal: ${agent.purpose}`,
+    account?.voiceSystemPrompt ? `\nCompany instructions:\n${account.voiceSystemPrompt}` : '',
+    knowledge ? `\nFACTS you may use (do not invent anything beyond these):\n${knowledge}` : '',
+    `\nYou are on a LIVE phone call. Reply with ONE short, natural spoken turn (1–3 sentences) in ${LANG_NAME[agent.language] ?? 'English'}.`,
+    'Do not narrate actions or use markdown. Keep moving the call toward the goal. If you do not know something, offer to have a human follow up.',
+  ].join('');
+
+  const transcript =
+    history.map((m) => `${m.role === 'user' ? 'Caller' : agent.name}: ${m.text}`).join('\n') + `\n${agent.name}:`;
+
+  let reply: string;
+  try {
+    reply = llm.info.live
+      ? (await llm.complete(transcript, { system, temperature: agent.temperature, maxTokens: 200 })).trim()
+      : demoFallback(lastUser, knowledge, agent.name);
+  } catch {
+    reply = demoFallback(lastUser, knowledge, agent.name);
+  }
+
+  return res.json({ reply: reply || demoFallback(lastUser, knowledge, agent.name), grounded: Boolean(knowledge), llm: llm.info });
+});
+
+/** Keyless demo reply — cites KB when available, else a helpful holding line. */
+function demoFallback(userText: string, knowledge: string, name: string): string {
+  if (knowledge) {
+    const fact = knowledge.split('\n')[0]?.replace(/^-\s*\([^)]*\)\s*/, '') ?? '';
+    return `Good question. From what I have on file: ${fact.slice(0, 180)} Would you like me to book a quick call to go over the details?`;
+  }
+  return `Thanks — I hear you on "${userText.slice(0, 60)}". Let me get you booked with ${name === 'you' ? 'our team' : 'one of our agents'} so we can help properly. What time works best? (Set an AI key for full conversational replies.)`;
+}
 
 /** Delete a custom agent, or reset a preset override to defaults. */
 voiceAgentsRouter.delete('/:key', async (req: Request, res: Response) => {

@@ -55,7 +55,7 @@ export class StripeClient {
       'line_items[0][price_data][currency]': 'usd',
       'line_items[0][price_data][unit_amount]': String(opts.priceMonthlyUsd * 100),
       'line_items[0][price_data][recurring][interval]': 'month',
-      'line_items[0][price_data][product_data][name]': `CloseFlow ${opts.planKey}`,
+      'line_items[0][price_data][product_data][name]': `TrueCode AI ${opts.planKey}`,
       'metadata[plan]': opts.planKey,
       'subscription_data[metadata][plan]': opts.planKey,
     });

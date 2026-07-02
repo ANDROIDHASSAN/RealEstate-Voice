@@ -1,4 +1,4 @@
-import { instagram, video } from '@closeflow/integrations';
+import { instagram, video } from '@truecode/integrations';
 import { logger } from '../logger.js';
 import { getQueue, QUEUES } from '../lib/queue.js';
 import { Account, ContentPost, VideoJob } from '../models.js';

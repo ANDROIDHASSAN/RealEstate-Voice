@@ -1,5 +1,5 @@
 """
-CloseFlow multi-agent orchestrator (M9).
+TrueCode Ai multi-agent orchestrator (M9).
 
 Config-driven crew: agents are data (crew_agents.json), the router decides the
 path, live agents may consult an LLM (Groq/Gemini via REST), and the response
@@ -17,7 +17,7 @@ import httpx
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="CloseFlow Agents", version="0.1.0")
+app = FastAPI(title="TrueCode Ai Agents", version="0.1.0")
 
 CONFIG = json.loads((Path(__file__).parent / "crew_agents.json").read_text(encoding="utf-8"))
 AGENTS = {a["key"]: a for a in CONFIG["agents"]}
@@ -60,7 +60,7 @@ class NextBestAction(BaseModel):
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "closeflow-agents", "agents": len(AGENTS), "llm": bool(GROQ_KEY or GEMINI_KEY)}
+    return {"ok": True, "service": "TrueCode Ai-agents", "agents": len(AGENTS), "llm": bool(GROQ_KEY or GEMINI_KEY)}
 
 
 @app.get("/agents")

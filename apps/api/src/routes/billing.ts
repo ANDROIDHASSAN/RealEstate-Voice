@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
-import { stripe } from '@closeflow/integrations';
-import { PLANS, modulesForPlan, subscribeSchema, type PlanKey } from '@closeflow/shared';
+import { stripe } from '@truecode/integrations';
+import { PLANS, modulesForPlan, subscribeSchema, type PlanKey } from '@truecode/shared';
 import { env } from '../env.js';
 import { logger } from '../logger.js';
 import { requireAuth } from '../middleware/auth.js';

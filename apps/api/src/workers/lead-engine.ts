@@ -1,4 +1,4 @@
-import { apify } from '@closeflow/integrations';
+import { apify } from '@truecode/integrations';
 import { logger } from '../logger.js';
 import { emitAgentEvent } from '../lib/events.js';
 import { getQueue, QUEUES } from '../lib/queue.js';

@@ -1,10 +1,10 @@
 /**
  * Seeds the demo Empire account so the deployed link looks alive immediately.
- * Login: demo@closeflow.io / Demo1234!
+ * Login: demo@truecode.ai / Demo1234!
  */
 import './env.js';
 import bcrypt from 'bcryptjs';
-import { modulesForPlan } from '@closeflow/shared';
+import { modulesForPlan } from '@truecode/shared';
 import { connectDb, disconnectDb } from './db.js';
 import {
   Account,
@@ -18,7 +18,7 @@ import {
 } from './models.js';
 
 export async function seedDemo(): Promise<{ accountId: string }> {
-  const email = 'demo@closeflow.io';
+  const email = 'demo@truecode.ai';
   const existing = await User.findOne({ email });
   if (existing) return { accountId: String(existing.accountId) };
 
@@ -161,7 +161,7 @@ if (isMain) {
   connectDb()
     .then(seedDemo)
     .then(({ accountId }) => {
-      console.log(`Seeded demo account ${accountId} (demo@closeflow.io / Demo1234!)`);
+      console.log(`Seeded demo account ${accountId} (demo@truecode.ai / Demo1234!)`);
       return disconnectDb();
     })
     .then(() => process.exit(0))

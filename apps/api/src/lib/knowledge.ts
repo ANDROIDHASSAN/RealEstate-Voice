@@ -1,4 +1,4 @@
-import { cosineSimilarity, getEmbeddings } from '@closeflow/integrations';
+import { cosineSimilarity, getEmbeddings } from '@truecode/integrations';
 import { logger } from '../logger.js';
 import { KnowledgeDoc } from '../models.js';
 

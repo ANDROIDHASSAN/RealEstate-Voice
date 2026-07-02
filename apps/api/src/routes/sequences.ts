@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { createSequenceSchema } from '@closeflow/shared';
+import { createSequenceSchema } from '@truecode/shared';
 import { z } from 'zod';
 import { requireAuth, requireModule } from '../middleware/auth.js';
 import { DripEnrollment, Sequence } from '../models.js';

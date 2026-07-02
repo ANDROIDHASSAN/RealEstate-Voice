@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { orchestrateSchema } from '@closeflow/shared';
+import { orchestrateSchema } from '@truecode/shared';
 import { env } from '../env.js';
 import { logger } from '../logger.js';
 import { requireAuth, requireModule } from '../middleware/auth.js';

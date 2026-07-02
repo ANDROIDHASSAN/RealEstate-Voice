@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { createLeadSchema } from '@closeflow/shared';
+import { createLeadSchema } from '@truecode/shared';
 import { z } from 'zod';
 import { getQueue, QUEUES } from '../lib/queue.js';
 import { requireAuth, requireModule } from '../middleware/auth.js';

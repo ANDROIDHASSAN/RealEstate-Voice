@@ -44,7 +44,7 @@ export function createApp(): Express {
   app.use(cookieParser());
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, service: 'closeflow-api', ts: new Date().toISOString() });
+    res.json({ ok: true, service: 'truecode-api', ts: new Date().toISOString() });
   });
 
   app.use('/auth', authRouter);

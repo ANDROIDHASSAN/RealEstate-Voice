@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
-import { apify, getLLM, instagram, resend, stripe, twilio, video, whatsapp } from '@closeflow/integrations';
-import { getVoiceProvider } from '@closeflow/voice';
+import { apify, getLLM, instagram, resend, stripe, twilio, video, whatsapp } from '@truecode/integrations';
+import { getVoiceProvider } from '@truecode/voice';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { Account, Compliance, User } from '../models.js';

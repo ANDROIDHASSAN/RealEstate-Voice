@@ -67,7 +67,7 @@ Warm, concise, confident. Never pushy. Mirror the caller's pace.
 - If asked something you don't know, offer to have a human follow up.
 - Respect Do-Not-Call and quiet hours.`;
 
-export function AgentStudio({ onSelectForTest }: { onSelectForTest?: (key: string) => void }) {
+export function AgentStudio({ onSelectForTest, onDemo }: { onSelectForTest?: (key: string) => void; onDemo?: (key: string, name: string) => void }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const studio = useQuery({ queryKey: ['voice-studio'], queryFn: () => api<StudioResponse>('/voice-agents') });
@@ -284,6 +284,9 @@ export function AgentStudio({ onSelectForTest }: { onSelectForTest?: (key: strin
               <Button onClick={() => save.mutate(draft)} disabled={save.isPending}>
                 <Save className="h-4 w-4" /> {savedFlash ? t('studio.saved') : save.isPending ? '…' : t('studio.save')}
               </Button>
+              {onDemo && (
+                <Button variant="pastel" onClick={() => onDemo(draft.key, draft.name)}>{t('voice.tryInBrowser')}</Button>
+              )}
               {onSelectForTest && (
                 <Button variant="secondary" onClick={() => onSelectForTest(draft.key)}>{t('studio.testThis')}</Button>
               )}

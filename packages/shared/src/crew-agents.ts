@@ -138,7 +138,7 @@ export const CREW_AGENTS: CrewAgentConfig[] = [
     key: 'crm-sync',
     name: 'CRM-Sync Agent',
     role: 'Data plumber',
-    goal: 'Keep GHL/CRM contact records in sync with CloseFlow lead state.',
+    goal: 'Keep GHL/CRM contact records in sync with TrueCode AI lead state.',
     emits: ['syncCrm'],
     status: 'ready',
   },

@@ -63,7 +63,7 @@
     isolated (`shouldPersistLocalDb()` gates on it).
 32. **Demo account auto-seeds on boot** (idempotent `seedDemo()`; opt out with
     AUTO_SEED_DEMO=0) so a fresh or reset local DB always has a working login
-    (demo@closeflow.io / Demo1234!). Unit tests never run `main()`, so they're
+    (demo@truecode.ai / Demo1234!). Unit tests never run `main()`, so they're
     unaffected.
 33. **Background dev servers started from the assistant end with its session.**
     That is a harness limitation, not the app — to keep the app up across
@@ -107,7 +107,7 @@
     transcript so grounding is visible without a live provider.
 40. **Voice Agent Studio** (`/voice-agents`, `apps/web/.../voice/AgentStudio.tsx`):
     a Vapi-style builder. Agents are config-driven data — presets in
-    `@closeflow/shared` can be overridden per account, and custom agents created.
+    `@truecode/shared` can be overridden per account, and custom agents created.
     Each agent has: identity + first message, system prompt, transcriber (STT),
     model (LLM) + temperature, voice (TTS), tool toggles (transfer/hangup/voicemail/
     DTMF/send-text/query-KB/API-request/book/tag), and attached KB docs. The worker

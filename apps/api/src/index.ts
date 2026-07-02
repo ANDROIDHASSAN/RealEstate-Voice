@@ -16,12 +16,12 @@ async function main(): Promise<void> {
   await applyStoredIntegrationKeys();
 
   // Auto-seed the demo account on boot so a fresh/restarted local DB always has
-  // a working login (demo@closeflow.io / Demo1234!). Idempotent; opt out with
+  // a working login (demo@truecode.ai / Demo1234!). Idempotent; opt out with
   // AUTO_SEED_DEMO=0. Skipped for unit tests (they never run main()).
   if (process.env.AUTO_SEED_DEMO !== '0') {
     try {
       const { accountId } = await seedDemo();
-      logger.info({ accountId }, 'demo account ready (demo@closeflow.io / Demo1234!)');
+      logger.info({ accountId }, 'demo account ready (demo@truecode.ai / Demo1234!)');
     } catch (err) {
       logger.warn({ err: (err as Error).message }, 'demo auto-seed skipped');
     }
@@ -35,7 +35,7 @@ async function main(): Promise<void> {
 
   const app = createApp();
   app.listen(env.port, () => {
-    logger.info({ port: env.port, env: env.nodeEnv }, 'CloseFlow API listening');
+    logger.info({ port: env.port, env: env.nodeEnv }, 'TrueCode AI API listening');
   });
 }
 

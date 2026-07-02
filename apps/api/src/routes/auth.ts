@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { Router, type Request, type Response } from 'express';
-import { modulesForPlan, loginSchema, signupSchema } from '@closeflow/shared';
+import { modulesForPlan, loginSchema, signupSchema } from '@truecode/shared';
 import { env } from '../env.js';
 import {
   rateLimit,
@@ -116,7 +116,7 @@ authRouter.post('/seed-demo', async (_req: Request, res: Response) => {
     return res.status(404).json({ error: 'not_found' });
   const { seedDemo } = await import('../seed.js');
   const result = await seedDemo();
-  return res.json({ ...result, email: 'demo@closeflow.io', password: 'Demo1234!' });
+  return res.json({ ...result, email: 'demo@truecode.ai', password: 'Demo1234!' });
 });
 
 authRouter.post('/logout', requireAuth, async (req: Request, res: Response) => {

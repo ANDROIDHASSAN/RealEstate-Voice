@@ -65,7 +65,7 @@ export async function connectDb(): Promise<void> {
 
   const server = await MongoMemoryServer.create(persist ? { instance } : undefined);
   memServer = server;
-  await mongoose.connect(server.getUri('closeflow'));
+  await mongoose.connect(server.getUri('truecode'));
   logger.info({ persisted: persist }, persist ? 'MongoDB connected (local, persisted to disk)' : 'MongoDB connected (in-memory)');
 }
 

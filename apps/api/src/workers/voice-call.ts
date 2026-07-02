@@ -1,5 +1,5 @@
-import { getVoiceProvider, type VoiceCallResult } from '@closeflow/voice';
-import { getVoiceAgent, voiceAgentForLocale, type Locale } from '@closeflow/shared';
+import { getVoiceProvider, type VoiceCallResult } from '@truecode/voice';
+import { getVoiceAgent, voiceAgentForLocale, type Locale } from '@truecode/shared';
 import { logger } from '../logger.js';
 import { complianceCheck } from '../lib/compliance.js';
 import { emitAgentEvent } from '../lib/events.js';

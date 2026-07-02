@@ -1,4 +1,4 @@
-import type { Channel, Locale } from '@closeflow/shared';
+import type { Channel, Locale } from '@truecode/shared';
 import { logger } from '../logger.js';
 import { mergeFields } from '../lib/merge.js';
 import { getQueue, QUEUES } from '../lib/queue.js';

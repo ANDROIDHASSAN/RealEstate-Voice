@@ -1,4 +1,4 @@
-import { getVoiceAgent, VOICE_AGENTS, VOICE_STUDIO_DEFAULTS, type Locale } from '@closeflow/shared';
+import { getVoiceAgent, VOICE_AGENTS, VOICE_STUDIO_DEFAULTS, type Locale } from '@truecode/shared';
 import { VoiceAgentConfig } from '../models.js';
 
 /** Fully-resolved agent config used by the worker + returned to the studio. */

@@ -26,7 +26,7 @@ services:
       dockerfile: apps/api/Dockerfile
     env_file: .env
     environment:
-      MONGO_URI: mongodb://mongo:27017/closeflow
+      MONGO_URI: mongodb://mongo:27017/TrueCode AI
       REDIS_URL: redis://redis:6379
       AGENTS_SERVICE_URL: http://agents:8000
     ports: ["4000:4000"]

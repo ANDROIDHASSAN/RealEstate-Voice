@@ -5,7 +5,7 @@ export class ResendClient {
     return envVal('RESEND_API_KEY');
   }
   private get from() {
-    return envVal('RESEND_FROM_EMAIL') || 'CloseFlow <noreply@closeflow.io>';
+    return envVal('RESEND_FROM_EMAIL') || 'TrueCode AI <noreply@truecode.ai>';
   }
 
   get info(): ProviderInfo {

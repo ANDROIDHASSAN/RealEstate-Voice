@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
-import { knowledgeDocSchema, knowledgeSearchSchema, voicePromptSchema } from '@closeflow/shared';
-import { getEmbeddings } from '@closeflow/integrations';
+import { knowledgeDocSchema, knowledgeSearchSchema, voicePromptSchema } from '@truecode/shared';
+import { getEmbeddings } from '@truecode/integrations';
 import { requireAuth } from '../middleware/auth.js';
 import { logger } from '../logger.js';
 import { emitAgentEvent } from '../lib/events.js';
@@ -89,7 +89,7 @@ knowledgeRouter.post('/url', async (req: Request, res: Response) => {
   if (!parsed.success) return res.status(400).json({ error: 'invalid_url' });
   let html: string;
   try {
-    const r = await fetch(parsed.data.url, { headers: { 'User-Agent': 'CloseFlowBot/1.0' }, signal: AbortSignal.timeout(15_000) });
+    const r = await fetch(parsed.data.url, { headers: { 'User-Agent': 'TrueCodeBot/1.0' }, signal: AbortSignal.timeout(15_000) });
     if (!r.ok) return res.status(400).json({ error: `fetch_failed_${r.status}` });
     html = await r.text();
   } catch (err) {

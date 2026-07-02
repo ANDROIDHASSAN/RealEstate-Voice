@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
-import { scrapeJobSchema } from '@closeflow/shared';
-import { apify } from '@closeflow/integrations';
+import { scrapeJobSchema } from '@truecode/shared';
+import { apify } from '@truecode/integrations';
 import { requireAuth, requireModule } from '../middleware/auth.js';
 import { getQueue, QUEUES } from '../lib/queue.js';
 import { ScrapeJob } from '../models.js';

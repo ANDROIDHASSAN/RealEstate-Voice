@@ -1,8 +1,8 @@
 {
-  "name": "closeflow",
+  "name": "TrueCode AI",
   "private": true,
   "version": "0.1.0",
-  "description": "CloseFlow OS — the operating system real estate agents run their business on.",
+  "description": "TrueCode AI OS — the operating system real estate agents run their business on.",
   "workspaces": [
     "packages/shared",
     "packages/integrations",

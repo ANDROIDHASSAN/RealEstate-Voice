@@ -1,5 +1,5 @@
 {
-  "name": "@closeflow/api",
+  "name": "@truecode/api",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -11,9 +11,9 @@
     "test": "vitest run --pool=forks"
   },
   "dependencies": {
-    "@closeflow/integrations": "*",
-    "@closeflow/shared": "*",
-    "@closeflow/voice": "*",
+    "@truecode/integrations": "*",
+    "@truecode/shared": "*",
+    "@truecode/voice": "*",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.34.0",
     "cookie-parser": "^1.4.7",

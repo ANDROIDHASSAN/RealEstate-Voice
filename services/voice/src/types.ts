@@ -1,4 +1,4 @@
-import type { CallOutcome, Locale } from '@closeflow/shared';
+import type { CallOutcome, Locale } from '@truecode/shared';
 
 export interface VoiceCallRequest {
   /** Our internal Call id — echoed back in events. */

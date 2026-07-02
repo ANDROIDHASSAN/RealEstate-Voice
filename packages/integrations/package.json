@@ -1,5 +1,5 @@
 {
-  "name": "@closeflow/integrations",
+  "name": "@truecode/integrations",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -16,7 +16,7 @@
     "dev": "tsc -p tsconfig.json --watch"
   },
   "dependencies": {
-    "@closeflow/shared": "*"
+    "@truecode/shared": "*"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

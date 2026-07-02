@@ -34,7 +34,16 @@
     "search": "Search leads…",
     "empty": "No leads yet",
     "emptyHint": "Point your Zillow, Facebook, and website forms at your intake webhook — new leads get an instant reply automatically.",
-    "status": { "new": "New", "contacted": "Contacted", "qualified": "Qualified", "appointment": "Appointment", "nurture": "Nurture", "won": "Won", "lost": "Lost", "dnc": "Do not contact" },
+    "status": {
+      "new": "New",
+      "contacted": "Contacted",
+      "qualified": "Qualified",
+      "appointment": "Appointment",
+      "nurture": "Nurture",
+      "won": "Won",
+      "lost": "Lost",
+      "dnc": "Do not contact"
+    },
     "firstResponse": "First response",
     "source": "Source",
     "score": "Score",
@@ -92,9 +101,19 @@
     "noResults": "No matching facts found. Add a document above.",
     "results": "Top matches"
   },
+  "demo": {
+    "onCall": "On call — live demo",
+    "speak": "Speak replies aloud",
+    "hangUp": "End demo",
+    "hold": "Tap to speak",
+    "say": "Type your reply, or tap the mic…",
+    "noMic": "Voice input isn't supported in this browser — type instead.",
+    "badge": "Browser demo · no phone needed"
+  },
   "voice": {
     "title": "Voice Agents",
     "subtitle": "Your 24/7 multilingual calling team",
+    "tryInBrowser": "Talk to this agent in the browser (no phone)",
     "engine": "Voice engine",
     "engineHint": "Pick the AI brain and voice your agents use on calls — changes apply to new calls instantly.",
     "test": "Test your voice agent",
@@ -210,7 +229,7 @@
     "language": "Dashboard language"
   },
   "assistant": {
-    "title": "CloseFlow Assistant",
+    "title": "TrueCode AI Assistant",
     "subtitle": "Type or speak — your agents do the work",
     "snapshot": "I'm watching your account: {{total}} leads total, {{week}} new this week, {{appts}} appointments booked. Ask me anything about it.",
     "intro": "Tell me what you want done — I'll route it to the right agent and you can watch it happen live. I can chain steps too: \"find luxury buyers in Miami and email them\".",
@@ -228,13 +247,34 @@
     "done": "Let's go!",
     "showMe": "Show me",
     "replay": "Replay the tour",
-    "welcome": { "title": "Welcome to CloseFlow OS", "body": "Think of it as a team of tireless robot helpers for your real-estate business. They answer leads, make calls, follow up, and find new clients — while you watch it all happen live." },
-    "leads": { "title": "Every lead answered in seconds", "body": "When someone asks about a home, your robot replies instantly by text — day or night. Fast replies win deals." },
-    "voice": { "title": "AI that talks on the phone", "body": "Your voice agents call new leads, ask the right questions, and book appointments — in 5 languages. You get the transcript." },
-    "leadEngine": { "title": "Find new clients on demand", "body": "Pick who you want (luxury buyers, FSBO sellers, investors…), pick a city, press go. Fresh prospects flow into your pipeline." },
-    "agents": { "title": "Watch your AI team work", "body": "This page shows every agent and what it's doing right now — glowing green means working. Give the team a goal and watch them decide." },
-    "assistant": { "title": "Just say what you want", "body": "Press the sparkle button (or Alt+K) and type — or tap the mic and speak. \"Call Maria\", \"find investors in Dubai\", \"go to settings\". Done." },
-    "keys": { "title": "Connect your accounts", "body": "In Settings, paste API keys for Twilio, WhatsApp and more. No keys yet? Everything still works in safe test mode so you can explore." }
+    "welcome": {
+      "title": "Welcome to TrueCode AI OS",
+      "body": "Think of it as a team of tireless robot helpers for your real-estate business. They answer leads, make calls, follow up, and find new clients — while you watch it all happen live."
+    },
+    "leads": {
+      "title": "Every lead answered in seconds",
+      "body": "When someone asks about a home, your robot replies instantly by text — day or night. Fast replies win deals."
+    },
+    "voice": {
+      "title": "AI that talks on the phone",
+      "body": "Your voice agents call new leads, ask the right questions, and book appointments — in 5 languages. You get the transcript."
+    },
+    "leadEngine": {
+      "title": "Find new clients on demand",
+      "body": "Pick who you want (luxury buyers, FSBO sellers, investors…), pick a city, press go. Fresh prospects flow into your pipeline."
+    },
+    "agents": {
+      "title": "Watch your AI team work",
+      "body": "This page shows every agent and what it's doing right now — glowing green means working. Give the team a goal and watch them decide."
+    },
+    "assistant": {
+      "title": "Just say what you want",
+      "body": "Press the sparkle button (or Alt+K) and type — or tap the mic and speak. \"Call Maria\", \"find investors in Dubai\", \"go to settings\". Done."
+    },
+    "keys": {
+      "title": "Connect your accounts",
+      "body": "In Settings, paste API keys for Twilio, WhatsApp and more. No keys yet? Everything still works in safe test mode so you can explore."
+    }
   },
   "auth": {
     "login": "Log in",

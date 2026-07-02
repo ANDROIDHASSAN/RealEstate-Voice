@@ -3,7 +3,7 @@ import { MapPin, Plus, Radar, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
-import { buildPersonaQuery, LEAD_PERSONAS, SCRAPE_COUNTRIES, type LeadPersona } from '@closeflow/shared';
+import { buildPersonaQuery, LEAD_PERSONAS, SCRAPE_COUNTRIES, type LeadPersona } from '@truecode/shared';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';

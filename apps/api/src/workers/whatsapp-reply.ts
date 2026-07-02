@@ -1,4 +1,4 @@
-import { getLLM } from '@closeflow/integrations';
+import { getLLM } from '@truecode/integrations';
 import { logger } from '../logger.js';
 import { sendOutbound } from '../lib/outbound.js';
 import { handleOptOut } from '../lib/compliance.js';

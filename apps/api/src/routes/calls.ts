@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
-import { localeSchema, triggerCallSchema, VOICE_AGENTS } from '@closeflow/shared';
-import { getVoiceProvider } from '@closeflow/voice';
+import { localeSchema, triggerCallSchema, VOICE_AGENTS } from '@truecode/shared';
+import { getVoiceProvider } from '@truecode/voice';
 import { z } from 'zod';
 import { getQueue, QUEUES } from '../lib/queue.js';
 import { requireAuth, requireModule } from '../middleware/auth.js';

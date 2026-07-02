@@ -33,7 +33,7 @@ async function req(method, path, body, auth = true) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const stamp = Date.now();
 
-console.log(`\n━━ CloseFlow acceptance vs ${BASE} ━━`);
+console.log(`\n━━ TrueCode AI acceptance vs ${BASE} ━━`);
 
 // ---------- Phase 0: core ----------
 console.log('\nPhase 0 — Core');

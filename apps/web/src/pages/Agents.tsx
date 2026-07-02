@@ -3,7 +3,7 @@ import { Activity, Bot, Play, Radio } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
-import { CREW_AGENTS } from '@closeflow/shared';
+import { CREW_AGENTS } from '@truecode/shared';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
