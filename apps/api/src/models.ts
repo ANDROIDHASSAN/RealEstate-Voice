@@ -226,6 +226,10 @@ const scrapeJobSchema = new Schema(
     source: { type: String, required: true },
     query: { type: String, required: true },
     maxResults: { type: Number, default: 25 },
+    country: String,
+    city: String,
+    personaKey: String,
+    filters: Schema.Types.Mixed,
     status: { type: String, enum: ['queued', 'running', 'done', 'error'], default: 'queued' },
     found: { type: Number, default: 0 },
     imported: { type: Number, default: 0 },
@@ -247,6 +251,22 @@ const videoJobSchema = new Schema(
   { timestamps: true },
 );
 
+/**
+ * Per-account provider credentials configured from Settings. Values are
+ * stored server-side only and always masked in API responses. On boot (and
+ * on save) they are applied to process.env so integration clients pick them
+ * up — single-instance semantics, documented in DECISIONS.md.
+ */
+const integrationSettingSchema = new Schema(
+  {
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', required: true, index: true },
+    provider: { type: String, required: true },
+    values: { type: Map, of: String, default: {} },
+  },
+  { timestamps: true },
+);
+integrationSettingSchema.index({ accountId: 1, provider: 1 }, { unique: true });
+
 function model<T extends Schema>(name: string, schema: T): Model<InferSchemaType<T>> {
   return (mongoose.models[name] as Model<InferSchemaType<T>>) ?? mongoose.model(name, schema);
 }
@@ -265,3 +285,4 @@ export const UsageLedger = model('UsageLedger', usageLedgerSchema);
 export const Compliance = model('Compliance', complianceSchema);
 export const ScrapeJob = model('ScrapeJob', scrapeJobSchema);
 export const VideoJob = model('VideoJob', videoJobSchema);
+export const IntegrationSetting = model('IntegrationSetting', integrationSettingSchema);

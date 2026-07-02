@@ -49,6 +49,9 @@ export default function Leads() {
   const leads = useQuery({
     queryKey: ['leads', search],
     queryFn: () => api<{ items: LeadRow[]; total: number }>(`/leads?search=${encodeURIComponent(search)}&limit=50`),
+    // Live view: instant-reply sets firstResponseSeconds seconds after a lead
+    // lands — poll so the ⚡ badge and status changes appear without a reload.
+    refetchInterval: 4000,
   });
 
   const addLead = useMutation({

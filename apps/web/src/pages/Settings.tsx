@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, KeyRound, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ExternalLink, KeyRound, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -11,12 +11,23 @@ import { PageSkeleton } from '../components/ui/skeleton';
 import { ErrorState } from '../components/ui/states';
 import { api } from '../lib/api';
 import { setLocale } from '../lib/i18n';
+import { cn } from '../lib/utils';
 import { useAuthStore, type SessionAccount } from '../store/auth';
 
-interface ProviderInfo {
+interface ProviderField {
+  var: string;
+  label: string;
+  secret: boolean;
+  configured: boolean;
+  maskedValue: string;
+}
+
+interface ProviderRow {
+  key: string;
   name: string;
-  live: boolean;
-  reason?: string;
+  docsUrl: string;
+  status: { name: string; live: boolean; reason?: string };
+  fields: ProviderField[];
 }
 
 interface ComplianceDoc {
@@ -25,15 +36,98 @@ interface ComplianceDoc {
   dncList: string[];
 }
 
+/** One expandable provider row: status badge + editable key fields. */
+function ProviderPanel({ provider }: { provider: ProviderRow }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [saved, setSaved] = useState(false);
+
+  const save = useMutation({
+    mutationFn: () => api(`/integrations/${provider.key}`, { method: 'PUT', body: { values } }),
+    onSuccess: () => {
+      setValues({});
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+      void qc.invalidateQueries({ queryKey: ['integrations'] });
+      void qc.invalidateQueries({ queryKey: ['providers'] });
+    },
+  });
+
+  const dirty = Object.values(values).some((v) => v.trim().length > 0);
+
+  return (
+    <li className="rounded-2xl bg-surface-2">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3 px-4 py-3 text-start text-sm"
+      >
+        <span className="min-w-0 flex-1 truncate font-medium">{provider.name}</span>
+        {provider.status.live ? (
+          <Badge tone="green">
+            <CheckCircle2 className="h-3 w-3" /> {t('settings.connected')}
+          </Badge>
+        ) : (
+          <Badge tone="yellow" title={provider.status.reason}>
+            {t('settings.needsKey')}
+          </Badge>
+        )}
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-ink-soft transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {open && (
+        <form
+          className="space-y-3 border-t border-black/5 px-4 py-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (dirty) save.mutate();
+          }}
+        >
+          {provider.fields.map((f) => (
+            <div key={f.var}>
+              <Label className="flex items-center justify-between">
+                <span>{f.label}</span>
+                {f.configured && <span className="text-xs font-normal text-ink-soft">{f.maskedValue}</span>}
+              </Label>
+              <Input
+                type={f.secret ? 'password' : 'text'}
+                autoComplete="off"
+                placeholder={f.configured ? t('settings.keySet') : t('settings.pasteKey')}
+                value={values[f.var] ?? ''}
+                onChange={(e) => setValues((prev) => ({ ...prev, [f.var]: e.target.value }))}
+              />
+            </div>
+          ))}
+          <div className="flex items-center justify-between gap-3">
+            <a
+              href={provider.docsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1 text-xs text-ink-soft underline decoration-dotted underline-offset-4 hover:text-ink"
+            >
+              {t('settings.whereKey')} <ExternalLink className="h-3 w-3" />
+            </a>
+            <Button type="submit" size="sm" disabled={!dirty || save.isPending}>
+              {saved ? `✓ ${t('common.save')}d` : save.isPending ? '…' : t('common.save')}
+            </Button>
+          </div>
+          {save.isError && <p className="text-xs text-red-600">{t('common.error')}</p>}
+        </form>
+      )}
+    </li>
+  );
+}
+
 export default function Settings() {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const { account, setAccount } = useAuthStore();
   const [dncEntry, setDncEntry] = useState('');
 
-  const providers = useQuery({
-    queryKey: ['providers'],
-    queryFn: () => api<{ providers: ProviderInfo[] }>('/account/providers'),
+  const integrations = useQuery({
+    queryKey: ['integrations'],
+    queryFn: () => api<{ providers: ProviderRow[] }>('/integrations'),
   });
   const compliance = useQuery({
     queryKey: ['compliance'],
@@ -51,8 +145,8 @@ export default function Settings() {
     onSuccess: (d) => setAccount(d.account),
   });
 
-  if (providers.isLoading || compliance.isLoading) return <PageSkeleton />;
-  if (providers.isError) return <ErrorState onRetry={() => void providers.refetch()} />;
+  if (integrations.isLoading || compliance.isLoading) return <PageSkeleton />;
+  if (integrations.isError) return <ErrorState onRetry={() => void integrations.refetch()} />;
   const c = compliance.data?.compliance;
 
   return (
@@ -60,26 +154,16 @@ export default function Settings() {
       <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        {/* Providers board */}
+        {/* Integrations — configure API keys right here */}
         <Card>
-          <div className="mb-4 flex items-center gap-2">
+          <div className="mb-1 flex items-center gap-2">
             <KeyRound className="h-5 w-5" />
             <CardTitle>{t('settings.providers')}</CardTitle>
           </div>
+          <CardDescription className="mb-4">{t('settings.providersHint')}</CardDescription>
           <ul className="space-y-2.5">
-            {(providers.data?.providers ?? []).map((p) => (
-              <li key={p.name} className="flex items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3 text-sm">
-                <span className="min-w-0 flex-1 truncate font-medium">{p.name}</span>
-                {p.live ? (
-                  <Badge tone="green">
-                    <CheckCircle2 className="h-3 w-3" /> {t('settings.connected')}
-                  </Badge>
-                ) : (
-                  <Badge tone="yellow" title={p.reason}>
-                    {t('settings.needsKey')}
-                  </Badge>
-                )}
-              </li>
+            {(integrations.data?.providers ?? []).map((p) => (
+              <ProviderPanel key={p.key} provider={p} />
             ))}
           </ul>
         </Card>

@@ -7,11 +7,14 @@ import { env } from './env.js';
 import { logger } from './logger.js';
 import { accountRouter } from './routes/account.js';
 import { appointmentsRouter } from './routes/appointments.js';
+import { assistantRouter } from './routes/assistant.js';
 import { authRouter } from './routes/auth.js';
 import { billingRouter, stripeWebhookHandler } from './routes/billing.js';
 import { callsRouter } from './routes/calls.js';
 import { contentRouter } from './routes/content.js';
 import { conversationsRouter } from './routes/conversations.js';
+import { eventsRouter } from './routes/events.js';
+import { integrationsRouter } from './routes/integrations.js';
 import { leadEngineRouter } from './routes/leadengine.js';
 import { leadsRouter } from './routes/leads.js';
 import { orchestratorRouter } from './routes/orchestrator.js';
@@ -56,6 +59,9 @@ export function createApp(): Express {
   app.use('/orchestrator', orchestratorRouter);
   app.use('/website', websiteRouter);
   app.use('/webhook', webhookRouter);
+  app.use('/events', eventsRouter);
+  app.use('/assistant', assistantRouter);
+  app.use('/integrations', integrationsRouter);
 
   app.use((_req, res) => res.status(404).json({ error: 'not_found' }));
 

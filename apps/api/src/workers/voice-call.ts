@@ -2,6 +2,7 @@ import { getVoiceProvider, type VoiceCallResult } from '@closeflow/voice';
 import { getVoiceAgent, voiceAgentForLocale, type Locale } from '@closeflow/shared';
 import { logger } from '../logger.js';
 import { complianceCheck } from '../lib/compliance.js';
+import { emitAgentEvent } from '../lib/events.js';
 import { mergeFields } from '../lib/merge.js';
 import { getQueue, QUEUES } from '../lib/queue.js';
 import { sendOutbound } from '../lib/outbound.js';
@@ -77,6 +78,13 @@ export function registerVoiceCallWorker(): void {
     call.providerCallId = providerCallId;
     call.status = 'ringing';
     await call.save();
+    emitAgentEvent(accountId, {
+      type: 'call',
+      agentKey: agent.key,
+      title: `${agent.name} is calling ${lead.firstName}`,
+      detail: `Dialing ${lead.phone} via ${provider.name}`,
+      status: 'running',
+    });
     logger.info({ callId: String(call._id), agentKey: agent.key, provider: provider.name }, 'voice call started');
   });
 }
@@ -145,5 +153,12 @@ export async function handleVoiceProviderEvent(result: VoiceCallResult): Promise
   }
 
   await call.save();
+  emitAgentEvent(accountId, {
+    type: 'call',
+    agentKey: call.agentKey,
+    title: `Call ${result.status}${result.outcome ? ` — ${result.outcome}` : ''}`,
+    detail: result.summary?.slice(0, 140),
+    status: result.status === 'failed' ? 'error' : 'done',
+  });
   logger.info({ callId: String(call._id), outcome: result.outcome }, 'voice call completed');
 }

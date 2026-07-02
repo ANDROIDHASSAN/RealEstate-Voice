@@ -3,6 +3,7 @@ import { orchestrateSchema } from '@closeflow/shared';
 import { env } from '../env.js';
 import { logger } from '../logger.js';
 import { requireAuth, requireModule } from '../middleware/auth.js';
+import { emitAgentEvent } from '../lib/events.js';
 import { getQueue, QUEUES } from '../lib/queue.js';
 import { sendOutbound } from '../lib/outbound.js';
 import { enrollLead } from '../workers/drip.js';
@@ -43,6 +44,13 @@ orchestratorRouter.post('/run', async (req: Request, res: Response) => {
     input: { leadId, goal },
     status: 'running',
   });
+  emitAgentEvent(accountId, {
+    type: 'agent:start',
+    agentKey: 'router',
+    title: `Crew routing: "${goal}"`,
+    detail: `Lead ${lead.firstName ?? ''} · status ${lead.status}`,
+    status: 'running',
+  });
 
   let action: NextBestAction;
   let source: 'crewai' | 'ts-fallback' = 'ts-fallback';
@@ -74,6 +82,17 @@ orchestratorRouter.post('/run', async (req: Request, res: Response) => {
     action = fallbackRoute(lead as never, Boolean(lastCall), goal);
   }
 
+  // Surface each hop of the agent path so the UI shows the crew working.
+  for (const hop of action.agentPath) {
+    emitAgentEvent(accountId, {
+      type: 'agent:step',
+      agentKey: hop,
+      title: `${hop} evaluated the lead`,
+      detail: hop === action.agentPath[action.agentPath.length - 1] ? action.reasoning.slice(0, 160) : undefined,
+      status: 'done',
+    });
+  }
+
   // Execute the next-best-action (all outbound paths run ComplianceGuard).
   const executed = await execute(accountId, leadId, action);
 
@@ -81,6 +100,13 @@ orchestratorRouter.post('/run', async (req: Request, res: Response) => {
   run.nextAction = action as never;
   run.status = 'done';
   await run.save();
+  emitAgentEvent(accountId, {
+    type: 'agent:done',
+    agentKey: 'next-best-action',
+    title: `Next best action: ${action.type}`,
+    detail: action.reasoning.slice(0, 160),
+    status: 'done',
+  });
 
   return res.json({ action, executed, source, runId: String(run._id) });
 });

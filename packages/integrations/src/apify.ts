@@ -28,7 +28,12 @@ export class ApifyClient {
     };
   }
 
-  async runScrape(source: string, query: string, maxResults: number): Promise<ScrapedLead[]> {
+  async runScrape(
+    source: string,
+    query: string,
+    maxResults: number,
+    filters?: { radiusKm?: number; minRating?: number; hasPhone?: boolean },
+  ): Promise<ScrapedLead[]> {
     if (!this.info.live) return this.mockDataset(source, query, maxResults);
     // Actor per source; google-maps as the canonical example.
     const actorId = source === 'google-maps' ? 'compass~crawler-google-places' : 'apify~web-scraper';
@@ -37,7 +42,13 @@ export class ApifyClient {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ searchStringsArray: [query], maxCrawledPlacesPerSearch: maxResults }),
+        body: JSON.stringify({
+          searchStringsArray: [query],
+          maxCrawledPlacesPerSearch: maxResults,
+          ...(filters?.radiusKm ? { searchRadiusKm: filters.radiusKm } : {}),
+          ...(filters?.minRating ? { minStars: filters.minRating } : {}),
+          ...(filters?.hasPhone ? { skipPlacesWithoutPhone: true } : {}),
+        }),
       },
     );
     if (!res.ok) throw new Error(`Apify HTTP ${res.status}`);

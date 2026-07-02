@@ -1,5 +1,6 @@
 import { apify } from '@closeflow/integrations';
 import { logger } from '../logger.js';
+import { emitAgentEvent } from '../lib/events.js';
 import { getQueue, QUEUES } from '../lib/queue.js';
 import { sendOutbound } from '../lib/outbound.js';
 import { Lead, ScrapeJob, UsageLedger } from '../models.js';
@@ -17,8 +18,20 @@ export function registerLeadEngineWorkers(): void {
     if (!job) return;
     job.status = 'running';
     await job.save();
+    emitAgentEvent(String(job.accountId), {
+      type: 'scrape',
+      agentKey: 'lead-engine',
+      title: `Lead Engine scraping "${job.query}"`,
+      detail: `Source: ${job.source} · up to ${job.maxResults} prospects`,
+      status: 'running',
+    });
     try {
-      const prospects = await apify.runScrape(job.source, job.query, job.maxResults);
+      const prospects = await apify.runScrape(
+        job.source,
+        job.query,
+        job.maxResults,
+        (job.filters ?? undefined) as { radiusKm?: number; minRating?: number; hasPhone?: boolean } | undefined,
+      );
       job.found = prospects.length;
 
       let imported = 0;
@@ -63,10 +76,24 @@ export function registerLeadEngineWorkers(): void {
         );
       });
       logger.info({ jobId: String(job._id), found: job.found, imported }, 'scrape job done');
+      emitAgentEvent(String(job.accountId), {
+        type: 'scrape',
+        agentKey: 'lead-engine',
+        title: `Scrape done — ${job.found} found, ${imported} imported`,
+        detail: `"${job.query}" · email-first cold campaign queued`,
+        status: 'done',
+      });
     } catch (err) {
       job.status = 'error';
       job.error = (err as Error).message;
       await job.save();
+      emitAgentEvent(String(job.accountId), {
+        type: 'scrape',
+        agentKey: 'lead-engine',
+        title: `Scrape failed — "${job.query}"`,
+        detail: (err as Error).message,
+        status: 'error',
+      });
       throw err;
     }
   });

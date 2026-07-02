@@ -69,10 +69,55 @@ export const generateCaptionSchema = z.object({
   count: z.number().min(1).max(5).default(3),
 });
 
+export const scrapeFiltersSchema = z.object({
+  minRating: z.number().min(0).max(5).optional(),
+  hasPhone: z.boolean().optional(),
+  hasEmail: z.boolean().optional(),
+  propertyType: z.enum(['residential', 'condo', 'luxury', 'commercial', 'land', 'any']).optional(),
+  budgetBand: z.enum(['entry', 'mid', 'high', 'ultra', 'any']).optional(),
+  language: z.enum(['en', 'es', 'ar', 'pt', 'ht', 'any']).optional(),
+  radiusKm: z.number().min(1).max(500).optional(),
+});
+
 export const scrapeJobSchema = z.object({
   source: z.enum(['google-maps', 'zillow-fsbo', 'expired', 'instagram']),
   query: z.string().min(2).max(300),
   maxResults: z.number().min(1).max(200).default(25),
+  country: z.string().max(60).optional(),
+  city: z.string().max(80).optional(),
+  personaKey: z.string().max(60).optional(),
+  filters: scrapeFiltersSchema.optional(),
+});
+
+/** Assistant — one natural-language command (typed or voice-transcribed). */
+export const assistantCommandSchema = z.object({
+  text: z.string().min(1).max(1000),
+  /** Where the user currently is, so the assistant can answer contextually. */
+  page: z.string().max(60).optional(),
+  locale: localeSchema.default('en'),
+});
+
+/** Actions the assistant is allowed to execute — a closed, auditable set. */
+export const assistantActionSchema = z.object({
+  action: z.enum([
+    'navigate',
+    'create_lead',
+    'start_scrape',
+    'trigger_call',
+    'send_message',
+    'orchestrate',
+    'set_language',
+    'answer',
+    'clarify',
+  ]),
+  params: z.record(z.unknown()).default({}),
+  reply: z.string().max(2000).default(''),
+});
+
+/** Per-provider API-key payload saved from Settings. Values are write-only. */
+export const integrationKeysSchema = z.object({
+  provider: z.enum(['twilio', 'whatsapp', 'resend', 'llm', 'stripe', 'apify', 'instagram', 'video', 'voice']),
+  values: z.record(z.string().max(500)),
 });
 
 export const orchestrateSchema = z.object({

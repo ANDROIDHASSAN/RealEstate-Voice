@@ -3,6 +3,7 @@ import type { Channel } from '@closeflow/shared';
 import { logger } from '../logger.js';
 import { Conversation, Lead, UsageLedger } from '../models.js';
 import { complianceCheck, type OutboundKind } from './compliance.js';
+import { emitAgentEvent } from './events.js';
 
 export interface OutboundResult {
   ok: boolean;
@@ -26,6 +27,13 @@ export async function sendOutbound(opts: {
   const check = await complianceCheck({ accountId: opts.accountId, leadId: opts.leadId, kind });
   if (!check.allowed) {
     await logMessage(opts, 'blocked', { reason: check.reason });
+    emitAgentEvent(opts.accountId, {
+      type: 'outbound',
+      agentKey: 'compliance-guard',
+      title: `ComplianceGuard blocked ${opts.channel}`,
+      detail: check.reason,
+      status: 'blocked',
+    });
     return { ok: false, status: 'blocked', reason: check.reason };
   }
 
@@ -67,6 +75,13 @@ export async function sendOutbound(opts: {
     await lead.save();
   }
   logger.info({ leadId: opts.leadId, channel: opts.channel, status }, 'outbound processed');
+  emitAgentEvent(opts.accountId, {
+    type: 'outbound',
+    agentKey: (opts.meta?.kind as string) ?? 'outbound',
+    title: `${opts.channel.toUpperCase()} → ${lead.firstName}${lead.lastName ? ` ${lead.lastName}` : ''}`,
+    detail: opts.text.slice(0, 140),
+    status: status === 'failed' ? 'error' : 'done',
+  });
   return { ok: status !== 'failed', status, reason };
 }
 

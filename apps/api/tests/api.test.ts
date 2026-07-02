@@ -112,6 +112,105 @@ describe('lead intake + tenant isolation', () => {
   });
 });
 
+describe('assistant commands', () => {
+  it('navigate command returns a client action', async () => {
+    const res = await request(app)
+      .post('/assistant/command')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ text: 'go to leads', locale: 'en' });
+    expect(res.status).toBe(200);
+    expect(res.body.action).toBe('navigate');
+    expect(res.body.clientAction.path).toBe('/leads');
+  });
+
+  it('create lead command actually creates a scoped lead', async () => {
+    const res = await request(app)
+      .post('/assistant/command')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ text: 'add lead Casper Test phone +13055557777', locale: 'en' });
+    expect(res.status).toBe(200);
+    expect(res.body.action).toBe('create_lead');
+    const leads = await request(app).get('/leads?limit=100').set('Authorization', `Bearer ${tokenA}`);
+    const created = leads.body.items.find((l: { firstName: string }) => l.firstName === 'Casper');
+    expect(created).toBeDefined();
+    expect(created.consent.sms).toBe(false); // no TCPA consent from voice/typed entry
+  });
+
+  it('unintelligible command asks to clarify instead of acting', async () => {
+    const res = await request(app)
+      .post('/assistant/command')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ text: 'purple monkey dishwasher', locale: 'en' });
+    expect(res.body.action).toBe('clarify');
+  });
+
+  it('scrape command respects module gating (pro plan lacks leadEngine)', async () => {
+    const res = await request(app)
+      .post('/assistant/command')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ text: 'find luxury buyers in Miami', locale: 'en' });
+    expect(res.status).toBe(200);
+    expect(res.body.reply).toMatch(/plan|Empire/i);
+  });
+});
+
+describe('agent activity events', () => {
+  it('records outbound activity in the per-account feed', async () => {
+    const res = await request(app).get('/events/recent').set('Authorization', `Bearer ${tokenA}`);
+    expect(res.status).toBe(200);
+    expect(res.body.items.length).toBeGreaterThan(0);
+    // Instant-reply run earlier in this suite must be visible
+    expect(res.body.items.some((e: { agentKey: string }) => e.agentKey === 'instant-reply')).toBe(true);
+  });
+
+  it('tenant B sees none of tenant A activity', async () => {
+    const res = await request(app).get('/events/recent').set('Authorization', `Bearer ${tokenB}`);
+    expect(res.body.items).toHaveLength(0);
+  });
+
+  it('SSE stream rejects missing/invalid tokens', async () => {
+    expect((await request(app).get('/events/stream')).status).toBe(401);
+    expect((await request(app).get('/events/stream?token=garbage')).status).toBe(401);
+  });
+});
+
+describe('integration key management', () => {
+  it('lists the provider catalog with masked values', async () => {
+    const res = await request(app).get('/integrations').set('Authorization', `Bearer ${tokenA}`);
+    expect(res.status).toBe(200);
+    const twilio = res.body.providers.find((p: { key: string }) => p.key === 'twilio');
+    expect(twilio.fields.map((f: { var: string }) => f.var)).toContain('TWILIO_AUTH_TOKEN');
+  });
+
+  it('saves a key, masks it on read, and never echoes the raw value', async () => {
+    const res = await request(app)
+      .put('/integrations/apify')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ values: { APIFY_TOKEN: 'apify_secret_token_12345' } });
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(res.body)).not.toContain('apify_secret_token_12345');
+    const list = await request(app).get('/integrations').set('Authorization', `Bearer ${tokenA}`);
+    const apify = list.body.providers.find((p: { key: string }) => p.key === 'apify');
+    const field = apify.fields.find((f: { var: string }) => f.var === 'APIFY_TOKEN');
+    expect(field.configured).toBe(true);
+    expect(field.maskedValue).not.toContain('secret_token');
+    delete process.env.APIFY_TOKEN; // don't leak into later tests
+  });
+
+  it('rejects unknown providers and env vars outside the catalog', async () => {
+    const bad = await request(app)
+      .put('/integrations/nope')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ values: { X: 'y' } });
+    expect(bad.status).toBe(404);
+    const inject = await request(app)
+      .put('/integrations/twilio')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ values: { PATH: 'evil' } });
+    expect(inject.status).toBe(400);
+  });
+});
+
 describe('compliance', () => {
   it('blocks outbound to DNC numbers', async () => {
     await request(app)

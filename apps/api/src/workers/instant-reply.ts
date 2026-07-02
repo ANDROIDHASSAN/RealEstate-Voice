@@ -1,5 +1,6 @@
 import type { Locale } from '@closeflow/shared';
 import { logger } from '../logger.js';
+import { emitAgentEvent } from '../lib/events.js';
 import { mergeFields } from '../lib/merge.js';
 import { getQueue, QUEUES } from '../lib/queue.js';
 import { sendOutbound } from '../lib/outbound.js';
@@ -35,6 +36,13 @@ export function registerInstantReplyWorker(): void {
     };
 
     const channel = lead.phone ? 'sms' : 'email';
+    emitAgentEvent(accountId, {
+      type: 'agent:start',
+      agentKey: 'instant-reply',
+      title: `Instant Reply engaging ${lead.firstName}`,
+      detail: `New ${lead.source} lead — replying by ${channel} in ${locale}`,
+      status: 'running',
+    });
     const result = await sendOutbound({
       accountId,
       leadId,

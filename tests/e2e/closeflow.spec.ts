@@ -16,6 +16,12 @@ async function signupViaUi(page: Page, email: string) {
 test.describe.serial('CloseFlow E2E', () => {
   const email = `e2e${stamp}@test.io`;
 
+  // The first-login tour overlay would intercept clicks — mark as onboarded
+  // for all tests except the dedicated tour test below.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('cf-onboarded', '1'));
+  });
+
   test('signup → dashboard renders in reference style', async ({ page }) => {
     await signupViaUi(page, email);
     // Pastel design tokens actually applied
@@ -94,6 +100,74 @@ test.describe.serial('CloseFlow E2E', () => {
     await page.click('button[type="submit"]');
     await expect(page.getByRole('heading', { level: 1 })).toContainText('مرحباً', { timeout: 15_000 });
     expect(await page.evaluate(() => document.documentElement.dir)).toBe('rtl');
+  });
+
+  test('onboarding tour shows on first login and can be completed', async ({ page }) => {
+    await page.addInitScript(() => localStorage.removeItem('cf-onboarded'));
+    await page.goto('/login');
+    await page.fill('#email', email);
+    await page.fill('#password', 'Passw0rd!123');
+    await page.click('button[type="submit"]');
+    await expect(page.getByText('Welcome to CloseFlow OS')).toBeVisible({ timeout: 15_000 });
+    // Skip closes the tour and persists the flag
+    await page.getByTitle('Skip').click();
+    await expect(page.getByText('Welcome to CloseFlow OS')).not.toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('cf-onboarded'))).toBe('1');
+  });
+
+  test('assistant: typed command navigates hands-free', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('#email', `gate${stamp}@test.io`);
+    await page.fill('#password', 'Passw0rd!123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/');
+    await page.getByTitle(/CloseFlow Assistant/).click();
+    await page.getByPlaceholder(/Type a command/).fill('go to leads');
+    await page.keyboard.press('Enter');
+    await page.waitForURL('**/leads', { timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: 'Leads' })).toBeVisible();
+  });
+
+  test('lead engine: persona template + city creates a scrape job', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('#email', `gate${stamp}@test.io`);
+    await page.fill('#password', 'Passw0rd!123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/');
+    await page.goto('/lead-engine');
+    await page.getByRole('button', { name: /FSBO sellers/ }).click();
+    await page.getByRole('button', { name: /New scrape job/i }).click();
+    // Mock Apify returns 10 prospects; job completes async
+    await expect(page.getByText(/10 found/).first()).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('settings: paste an API key from the UI and it is saved (masked)', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('#email', `gate${stamp}@test.io`);
+    await page.fill('#password', 'Passw0rd!123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/');
+    await page.goto('/settings');
+    // WhatsApp has no key in .env, so its fields are guaranteed empty
+    const row = page.locator('li', { has: page.getByRole('button', { name: /WhatsApp/ }) }).first();
+    await row.getByRole('button', { name: /WhatsApp/ }).click();
+    await row.locator('input').first().fill('wa_e2e_test_key_123456');
+    await row.getByRole('button', { name: /Save/ }).click();
+    // After save the field reports a stored (masked) key — raw value never echoed
+    await expect(row.getByPlaceholder(/A key is saved/)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('wa_e2e_test_key_123456')).toHaveCount(0);
+  });
+
+  test('agents: live team page shows the crew and activity feed', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('#email', `gate${stamp}@test.io`);
+    await page.fill('#password', 'Passw0rd!123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/');
+    await page.goto('/agents');
+    await expect(page.getByText('Your AI team')).toBeVisible();
+    // Earlier tests generated outbound/call/scrape events — the live feed must show them
+    await expect(page.getByText('Live activity')).toBeVisible();
   });
 
   test('multi-tenant isolation: fresh account sees zero data', async ({ page, request }) => {

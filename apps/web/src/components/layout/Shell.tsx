@@ -4,6 +4,7 @@ import {
   CalendarHeart,
   CreditCard,
   Globe,
+  HelpCircle,
   Home,
   Inbox,
   LogOut,
@@ -13,11 +14,15 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react';
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../lib/api';
 import { cn, initials } from '../../lib/utils';
 import { hasModule, useAuthStore } from '../../store/auth';
+import { CommandCenter } from '../assistant/CommandCenter';
+import { LanguageSelector } from '../LanguageSelector';
+import { shouldShowTour, Tour } from '../onboarding/Tour';
 
 interface NavItem {
   to: string;
@@ -68,6 +73,7 @@ export function Shell() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, account, logout } = useAuthStore();
+  const [tourOpen, setTourOpen] = useState(() => shouldShowTour());
 
   const onLogout = async () => {
     try {
@@ -113,6 +119,14 @@ export function Shell() {
               <p className="truncate text-sm text-ink-soft">{account?.name}</p>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setTourOpen(true)}
+                title={t('tour.replay')}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-surface text-ink-soft shadow-soft transition-colors hover:text-ink"
+              >
+                <HelpCircle className="h-5 w-5" />
+              </button>
+              <LanguageSelector />
               <span className="rounded-pill bg-surface px-4 py-1.5 text-xs font-medium capitalize shadow-soft">
                 {account?.plan}
               </span>
@@ -124,6 +138,8 @@ export function Shell() {
           <Outlet />
         </main>
       </div>
+      <CommandCenter />
+      {tourOpen && <Tour onClose={() => setTourOpen(false)} />}
     </div>
   );
 }
