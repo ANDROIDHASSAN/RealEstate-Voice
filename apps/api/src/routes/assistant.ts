@@ -162,9 +162,10 @@ assistantRouter.post('/command', async (req: Request, res: Response) => {
 
   const clientActions: Record<string, unknown>[] = [];
   const replies: string[] = [];
+  const turn: TurnState = { scrapeQueued: false };
 
   for (const step of plan.steps) {
-    const out = await executeAction(accountId, context, step, steps);
+    const out = await executeAction(accountId, context, step, steps, turn);
     if (out.reply) replies.push(out.reply);
     if (out.clientAction) clientActions.push(out.clientAction);
   }
@@ -173,7 +174,9 @@ assistantRouter.post('/command', async (req: Request, res: Response) => {
     emitAgentEvent(accountId, { type: 'assistant', agentKey: step.agentKey, title: step.title, detail: step.detail, status: step.status });
   }
 
-  const finalReply = [plan.reply, ...replies].filter(Boolean).join(' ');
+  // Assemble the reply, dropping fragments already covered by an earlier one
+  // (the LLM's overall reply often restates a step reply — don't say it twice).
+  const finalReply = dedupeFragments([plan.reply, ...replies]);
   // Prefer a single navigate/language action for the client; refreshes merge.
   const primary = clientActions.find((a) => a.type === 'navigate' || a.type === 'set_language' || a.type === 'orchestrate');
 
@@ -355,11 +358,16 @@ function filterFromPhrase(phrase: string, scrapedThisTurn: boolean): Record<stri
 // Execution.
 // ---------------------------------------------------------------------------
 
+interface TurnState {
+  scrapeQueued: boolean;
+}
+
 async function executeAction(
   accountId: string,
   context: AssistantContext,
   action: PlannedAction,
   steps: AssistantStep[],
+  turn: TurnState,
 ): Promise<{ reply?: string; clientAction?: Record<string, unknown> }> {
   const p = action.params as Record<string, string | number | boolean | Record<string, unknown> | undefined>;
   switch (action.action) {
@@ -398,9 +406,14 @@ async function executeAction(
         return { reply: 'Lead Engine is not on your plan — upgrade to Empire to unlock prospecting.' };
       }
       const persona = p.personaKey ? getLeadPersona(String(p.personaKey)) : undefined;
-      const query = persona
-        ? buildPersonaQuery(persona.queryTemplate, p.city ? String(p.city) : undefined, p.country ? String(p.country) : undefined)
-        : [p.query, p.city].filter(Boolean).join(' ');
+      const city = p.city ? String(p.city) : undefined;
+      const country = p.country ? String(p.country) : undefined;
+      // Build from whatever the planner gave us: an explicit query, or a
+      // location alone (a bare "Florida" is a fine Maps seed), or a persona.
+      let query = persona
+        ? buildPersonaQuery(persona.queryTemplate, city, country)
+        : [p.query, p.location, city, country].filter(Boolean).join(' ').trim();
+      if (!query && (city || country || p.location)) query = `real estate leads ${[city, country, p.location].filter(Boolean).join(' ')}`.trim();
       if (!query) return { reply: 'Tell me what to look for and where — e.g. "find luxury buyers in Miami".' };
       const job = await ScrapeJob.create({
         accountId,
@@ -413,6 +426,7 @@ async function executeAction(
         filters: persona?.filters,
       });
       await getQueue().enqueue(QUEUES.scrape, { jobId: String(job._id) });
+      turn.scrapeQueued = true;
       steps.push({ agentKey: 'lead-engine', title: `Scrape queued: "${query}"`, detail: `${job.source} · up to ${job.maxResults} · new leads auto-get a compliant intro email`, status: 'done' });
       return {
         reply: `Started finding "${query}". As leads arrive they'll automatically get a compliant intro email — calls and texts stay blocked until each lead opts in (TCPA).`,
@@ -454,7 +468,13 @@ async function executeAction(
       const filter = (p.filter as Record<string, unknown>) ?? { recent: true };
       const channel = pickChannel(String(p.channel));
       const leads = await resolveLeads(accountId, filter, 25);
-      if (!leads.length) return { reply: "I couldn't find any leads matching that set yet." };
+      if (!leads.length) {
+        return {
+          reply: turn.scrapeQueued
+            ? "Those leads are still being scraped — as each one lands it automatically gets a compliant intro email, so there's nothing to send manually."
+            : "I couldn't find any leads matching that set yet.",
+        };
+      }
       let sent = 0;
       let blocked = 0;
       for (const lead of leads) {
@@ -494,10 +514,13 @@ async function executeAction(
         status: callable.length ? 'done' : 'blocked',
       });
       const skipNote = skipped ? ` ${skipped} were skipped — they haven't given calling consent (cold/scraped leads can't be called until they opt in).` : '';
+      const emptyReply = turn.scrapeQueued
+        ? "The scraped leads can't be cold-called — they haven't given calling consent (TCPA). They'll get a compliant email instead, and you can call once they reply."
+        : `No leads in that set can be called yet — they need calling consent first.${skipNote}`;
       return {
         reply: callable.length
           ? `Queued AI calls to ${callable.length} lead${callable.length === 1 ? '' : 's'}.${skipNote}`
-          : `No leads in that set can be called yet — they need calling consent first.${skipNote}`,
+          : emptyReply,
         clientAction: callable.length ? { type: 'navigate', path: '/voice' } : undefined,
       };
     }
@@ -525,6 +548,18 @@ function answerFromContext(question: string, ctx: AssistantContext): string {
 // ---------------------------------------------------------------------------
 // Helpers.
 // ---------------------------------------------------------------------------
+
+/** Join reply fragments, skipping any that just restate what's already said. */
+function dedupeFragments(fragments: string[]): string {
+  const kept: string[] = [];
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+  for (const f of fragments.map((s) => s.trim()).filter(Boolean)) {
+    const nf = norm(f);
+    if (kept.some((k) => { const nk = norm(k); return nk.includes(nf) || nf.includes(nk); })) continue;
+    kept.push(f);
+  }
+  return kept.join(' ');
+}
 
 function pickChannel(raw: string): 'sms' | 'whatsapp' | 'email' {
   return raw === 'whatsapp' || raw === 'email' ? raw : raw === 'sms' ? 'sms' : 'sms';
