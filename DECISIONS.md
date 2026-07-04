@@ -349,3 +349,171 @@
     (`/voice-agents/:key/demo`) and live provider calls (`workers/voice-call.ts`)
     so behaviour is identical everywhere. The keyless fallback now does basic
     objection handling too. Suite: 90 passing.
+
+## 2026-07-03 — Hands-free Voice Mode (control the whole app by voice)
+
+71. **Voice Mode** (`apps/web/.../assistant/VoiceMode.tsx`) — a single tap (the
+    gradient waveform launcher in the floating stack, or **Alt+V**) drops the
+    whole dashboard into a continuous hands-free loop: greet → **listen** →
+    plan+execute → **speak** the result → listen again, with **barge-in** (talk
+    over the reply to interrupt, via `useMicLevel` VAD). It drives *any* action
+    the typed assistant can — navigation, lead creation, calls, messages,
+    scrapes, orchestration, language switch — because it POSTs to the same
+    `/assistant/command` route (LLM plans, Node executes through Queue +
+    ComplianceGuard). Deterministic keyless parser still works with no LLM key.
+72. **Shared command pipeline** (`apps/web/src/lib/useAssistantCommand.ts`) —
+    extracted from `CommandCenter` so the typed chat and Voice Mode run the
+    identical route + client-action executor (navigate/refresh/orchestrate/
+    set_language). No duplicated routing logic; one source of truth.
+73. **Glassmorphism UI + reactive blob orb** — new CSS utilities in `index.css`
+    (`.cf-glass`, `.cf-blob*`, `.cf-ripple`, `.cf-orb-halo`, `.cf-overlay-in`).
+    The orb is layered morphing pastel blobs (brand card colors) behind frosted
+    glass with a glossy highlight; it **scales live to mic amplitude** while
+    listening, ripples outward, and haloes while thinking/speaking. Full-screen
+    frosted backdrop over the blurred app. Status/interim-transcript/steps render
+    live. Degrades gracefully: no `SpeechRecognition` → shows an "unsupported"
+    note, orb still renders, controls disabled. i18n for all 5 locales
+    (`voiceMode.*`). Verified in-browser (Playwright): overlay opens via Alt+V,
+    the loop reaches the listening state, 0 console errors. web `tsc --noEmit`
+    clean. The floating launcher's redundant one-shot mic was replaced by the
+    Voice Mode button; the in-panel chat mic remains for typed-panel dictation.
+
+## 2026-07-03 — Voice Mode v2: stronger brain, live agents, live preview
+
+74. **Brain now understands "access everything".** The assistant failed on
+    natural phrasings like "give me all the leads which are there" (it hit the
+    rigid deterministic fallback → clarify). Fixes in `apps/api/.../assistant.ts`
+    + `packages/shared/schemas.ts`:
+    - New `list_leads` action (closed set) — reads the account's real leads from
+      the context snapshot, names a few + the status breakdown in the reply, and
+      navigates to /leads. Wired into BOTH the LLM action vocabulary and the
+      deterministic parser ("show/give/list/see my leads", "what are my leads").
+    - `PAGES` expanded from ~12 to the FULL route map (property-intelligence,
+      quotations, invoicing, deals, ledger, documents, cms, website, team, admin,
+      settings…) with natural synonyms, so "go to invoicing" / "open deals" work.
+    - Verified live (Playwright + real API): "give me all the leads which are
+      there" → `list_leads`→`navigate /leads` naming real leads; "go to invoicing"
+      → `/invoicing`. LLM confirmed live (Gemini gemini-2.0-flash); deterministic
+      fallback covers the same phrasings keyless.
+    - `dedupeFragments` gained a token-overlap (Jaccard ≥0.6) pass so the LLM's
+      prose reply doesn't double up a step's spoken summary.
+75. **Live multi-agent activity WHILE you talk.** Voice Mode subscribes to the
+    existing agent-event SSE (`useAgentEvents`) and renders an "AGENTS AT WORK"
+    glass panel — each crew agent (name via `getCrewAgent`) animates in with a
+    status dot + equalizer bars as work lands, filtered to the current session
+    (events since `sessionStart`). The assistant already emits an event per step,
+    and scrape/call workers emit their own, so the crew visibly lights up mid-
+    conversation.
+76. **Live preview via picture-in-picture.** Voice Mode can minimize to a compact
+    glass dock (corner) that keeps the loop running while REVEALING the app, so
+    you watch pages change / data update as you speak. It **auto-minimizes when a
+    command navigates/refreshes/orchestrates** (so you see the result), tapping
+    the frosted backdrop also previews, and a maximize button restores full view.
+    The full overlay is now scroll-safe (`overflow-y-auto`, capped agent feed) so
+    it never clips on short viewports. web + api `tsc --noEmit` clean; 0 console
+    errors in-browser.
+    - NOTE: "Playwright access" for the *product* is out of scope — embedding a
+      browser-automation engine into the shipped web app isn't safe/feasible.
+      The live in-app preview (PiP) is the equivalent capability: the agent acts
+      through the real app and you watch it happen.
+77. **Content Studio v2 — a full social + ads command center.** Rebuilt the
+    single-card Content page into a 6-tab studio (in-page `useState` tabs, matching
+    convention): Composer, Calendar, Media, Connections, Ads Manager, Market
+    Research. Everything follows the stub-vs-live rule — real when a key/OAuth
+    exists, labeled mock otherwise.
+    - **New providers** (`packages/integrations`, singleton+mock idiom): `facebook`
+      (Pages publish), `youtube` (Data API insert), `meta-ads` (Marketing API —
+      creates campaigns under the mandatory `HOUSING` special ad category, returns
+      deterministic seeded insights in mock), `meta-ad-library` (competitor
+      `ads_archive` search; mock returns a realistic labeled `[SAMPLE]` dataset
+      with angles/spend bands), `storage` (Vercel Blob / Cloudinary; mock inlines
+      uploads as data URLs so assets still render). All registered in the Settings
+      integration catalog with live/needs-key badges.
+    - **Composer**: live LLM generation (`/content/generate`) returns structured
+      variants (hook + caption + hashtags + firstComment + CTA) with a deterministic
+      non-lorem fallback; multi-platform publish (`/content/compose`) fans out one
+      `ContentPost` to per-platform adapters in the content worker, recording a
+      per-platform `results[]` and an aggregate status (published / partial /
+      stub-published / failed). Formats cover 1:1, 4:5, 9:16 (reel/story) and 16:9.
+    - **Ads Manager**: `AdCampaign` model + `adLaunch`/`adSync` queue workers.
+      Launch creates a draft → adapter → `active` (mock, labeled `stub`) or
+      `pending_review` (live, created PAUSED for operator review) → insights synced
+      to `metrics.daily` for Recharts. Gated by a NEW `ads` module flag (empire +
+      ultimate). `seedDemo` now reconciles an existing demo account's
+      `enabledModules` with its plan (union-only) so newly-added modules light up.
+    - **Market Research**: `AdResearch` + `CompetitorAd` models; `/content/research`
+      persists a run + its ads, with a watchlist toggle and angle-breakdown chart.
+    - New models: `MediaAsset`, `SocialConnection`, `AdCampaign`, `AdResearch`,
+      `CompetitorAd`; `ContentPost` extended (platforms[], format, mediaUrls[],
+      firstComment, results[]). Types/schemas centralized in
+      `packages/shared/src/content-studio.ts`. i18n added across all 5 locales.
+    - Verified against the live API (mock mode): overview, connections (all 5
+      platforms w/ honest reasons), media create, structured generation, multi-
+      platform compose → `stub-published` w/ ig/fb per-platform results, ad launch
+      → `active` w/ synthetic insights (≈49.6k impressions / 110 leads / $215 spend),
+      research → 6 `[SAMPLE]` competitor ads. shared+integrations+api `tsc` clean;
+      web `tsc -b && vite build` clean.
+
+## 2026-07-03 — Quotations 2.0 (industry-grade quote builder)
+
+- **Custom templates ("upload templates")**: new per-account `QuoteTemplate` model + CRUD at `/quotations/templates` (POST/PUT/DELETE), JSON `import` (upload) and per-quote `save-as-template`. `GET /templates` returns built-ins **and** the account's custom templates (`key: "custom:<id>"`, `custom:true`). The built-in template `category` was relaxed from an enum to a free string so any category is allowed.
+- **Managed categories + branding defaults**: new singleton `QuoteSettings` model (per account) at `/quotations/settings` — a de-duped/trimmed category list plus default currency/tax/valid-days/terms/notes/accent/logo. `GET` falls back to `DEFAULT_QUOTE_SETTINGS` when no doc exists (never crashes; that is why a pre-seeded demo account shows the 10 defaults).
+- **Richer line items + money math** (all backward-compatible, defaults preserve old totals): per-line `unit`, `discountPct`, `taxable` (default true), `optional` (default false). `computeTotals` now taxes only the taxable share, **excludes optional add-ons** from subtotal/total (surfaced as `optionalTotal`), and computes a `depositAmount`/`balanceDue` from a `depositType`/`depositValue`. Quote gained `taxLabel`, `summary`, `accentColor`, `logoUrl`, `client.company`; currencies extended (+INR/CAD/AUD).
+- **Builder overhaul** (`QuoteBuilder.tsx`): template gallery grouped by category (★ custom), per-line unit/discount/taxable/optional with reorder + duplicate, deposit + accent/logo branding, live totals incl. deposit/balance/optional add-ons, and a "Save as template" action. New `TemplateManager.tsx` manages custom templates (create/edit/delete/import/export) and the category list. Preview + PDF now group line items into category sections, honour the accent colour, per-line discounts, units, deposit and optional add-ons.
+- **Verified**: 98/98 api integration tests green (incl. new template CRUD, import, save-as-template, settings, deposit, taxable/optional math); every endpoint exercised via curl against the live server; UI driven end-to-end (create → save → grouped accent-branded preview with deposit; `QT-2026-0004` total €1,284 / deposit €385.20 = 30%). shared+api+web `tsc` clean for the touched files.
+- **Env note**: local `tsx watch` + the fixed-path local mongod (`.local-data/mongo`) flap on heavy DB writes (a 2nd mongod can't grab the lock), causing transient 500s in the browser during a restart window. Not a product bug — identical requests succeed via curl and in tests. Persistent `.local-data` also means `seedDemo` skips new seed data for an already-seeded demo account.
+
+## 2026-07-03 — AgentOps (evals · observability · human-in-the-loop · self-correction)
+
+A production-reliability layer for every AI action, gated by a new `agentOps`
+module flag (empire + ultimate; auto-included in ultimate via `ALL_MODULES`).
+Types + pure helpers live in `packages/shared/src/agentops.ts` (pricing/token
+estimators, trace/span, eval rubrics + assertions + `DEFAULT_EVAL_CASES`,
+approval actions/policy, Zod). Six new models: `Trace`, `EvalScore`, `EvalCase`,
+`EvalRun`, `Approval`, `AgentOpsConfig`.
+
+- **Eval harness (LLM-as-judge)** — `lib/judge.ts` scores any output against a
+  rubric (`CALL_RUBRIC` / `DECISION_RUBRIC`) and is **mock-safe**: no LLM key ⇒ a
+  deterministic heuristic (rewards outcome signals, penalizes pressure/guarantee
+  language) so evals, self-correction and the score trend work keyless and in
+  tests. Every completed call is auto-scored via a `score-call` job on the new
+  `eval` queue (enqueued from `handleVoiceProviderEvent`) → a `production`
+  `EvalScore`. Suites are split: **CAPABILITY** (hard tasks, low pass rates
+  expected) vs **REGRESSION** (near-100% by design — a dip means a prompt change
+  broke something that used to work). `runAssistantCommand` was extracted from the
+  assistant route so assistant-target cases run the exact same code path end-to-end.
+- **Observability** — `lib/observability.ts` provides AsyncLocalStorage tracing:
+  `withTrace()` opens a durable `Trace`, `getTracedLLM()` wraps `getLLM()` to time
+  each call and estimate in/out tokens + USD cost (transparent, same interface),
+  and `saveTrace()` persists out-of-band traces (voice calls at completion).
+  Assistant commands, evals and calls are traced. `/observability` exposes latency
+  (p50/p95), token cost, per-kind breakdown, a daily cost trend, span-level trace
+  detail, and **failure replay** (re-runs an assistant trace from its persisted
+  input under a fresh trace).
+- **Human-in-the-loop** — `lib/approvals.ts` is the gate: `requireApproval()`
+  checks a per-account policy and, if an action needs sign-off, persists the full
+  payload as a `pending` `Approval` and returns `{ gated:true }`; the caller stops
+  WITHOUT acting. `decideApproval()` (approve) looks up a registered executor and
+  **replays the persisted payload** — durable workflow resume (the pause can last
+  hours; state lives in Mongo, not an in-memory promise). Executors live in
+  `lib/approval-executors.ts` (registered at boot, kept out of `approvals.ts` to
+  avoid cycles). Gates wired into the single outbound chokepoint (`sendOutbound`:
+  sms/whatsapp/email), ad launch (`/content/ads` → spends money), and a new gated
+  `DELETE /leads/:id`. Policy is **opt-in, default OFF** for every action, so
+  enabling the module never silently changes existing send behavior.
+- **Self-correction** — `lib/self-correct.ts`: a failed production call score (≤
+  threshold) feeds the transcript + the judge's weakest criterion back into the
+  LLM to draft a better recovery follow-up, sent through the SAME gated channel
+  (compliance + approvals). Bounded by `selfCorrect.maxAttempts`; the retry + its
+  own score link to the original via `correctionOf`, so the failure→recovery chain
+  is visible in Evals.
+- **Web** — three gated pages (`Evals`, `Observability`, `Approvals`) + nav + i18n
+  (nav/labels in all 5 locales, full copy in `en` with fallback). Reuse the
+  existing tokens/primitives (StatCard, Card, Badge, Recharts, states).
+- **Seed** — `seedAgentOps` gives the demo (empire) a scored-call trend, two done
+  suite runs, real traces, parked approvals, and a showcase policy (money/delete
+  gated; routine sends open).
+- **Verified**: 105/105 api integration tests green (7 new: module gate, eval
+  stats+seed, regression suite run end-to-end, trace record + replay, HITL
+  delete→approve→execute + reject→409, tenant isolation). shared+api `tsc` clean;
+  web `tsc -b && vite build` clean; full `npm run build` clean.

@@ -9,6 +9,7 @@ export const MODULES = {
   instagram: 'instagram',
   website: 'website',
   content: 'content',
+  ads: 'ads',
   multiAgent: 'multiAgent',
   propertyIntel: 'propertyIntel',
   quotations: 'quotations',
@@ -18,6 +19,8 @@ export const MODULES = {
   documents: 'documents',
   cms: 'cms',
   analytics: 'analytics',
+  /** AgentOps: eval harness, observability, human-in-the-loop approvals, self-correction. */
+  agentOps: 'agentOps',
 } as const;
 
 export type ModuleFlag = (typeof MODULES)[keyof typeof MODULES];
@@ -67,6 +70,7 @@ export const PLANS = {
       'instagram',
       'website',
       'content',
+      'ads',
       'multiAgent',
       'propertyIntel',
       'quotations',
@@ -75,6 +79,7 @@ export const PLANS = {
       'ledger',
       'documents',
       'cms',
+      'agentOps',
     ] as ModuleFlag[],
   },
   /**

@@ -9,3 +9,8 @@ export * from './apify.js';
 export * from './ghl.js';
 export * from './instagram.js';
 export * from './video.js';
+export * from './facebook.js';
+export * from './youtube.js';
+export * from './meta-ads.js';
+export * from './meta-ad-library.js';
+export * from './storage.js';

@@ -1,15 +1,23 @@
 import { resend, twilio, whatsapp } from '@truecode/integrations';
-import type { Channel } from '@truecode/shared';
+import type { ApprovalAction, Channel } from '@truecode/shared';
 import { logger } from '../logger.js';
 import { Conversation, Lead, UsageLedger } from '../models.js';
+import { requireApproval } from './approvals.js';
 import { complianceCheck, type OutboundKind } from './compliance.js';
 import { emitAgentEvent } from './events.js';
 
 export interface OutboundResult {
   ok: boolean;
-  status: 'sent' | 'mock-sent' | 'blocked' | 'failed';
+  status: 'sent' | 'mock-sent' | 'blocked' | 'failed' | 'pending_approval';
   reason?: string;
+  approvalId?: string;
 }
+
+const CHANNEL_APPROVAL: Record<Exclude<Channel, 'instagram'>, ApprovalAction> = {
+  sms: 'send_sms',
+  whatsapp: 'send_whatsapp',
+  email: 'send_email',
+};
 
 /**
  * The ONLY function that sends messages. Every caller (instant reply, drips,
@@ -22,6 +30,9 @@ export async function sendOutbound(opts: {
   text: string;
   subject?: string;
   meta?: Record<string, unknown>;
+  /** Set when resuming an already-approved send (skips the HITL gate). */
+  skipApproval?: boolean;
+  requestedBy?: string;
 }): Promise<OutboundResult> {
   const kind: OutboundKind = opts.channel;
   const check = await complianceCheck({ accountId: opts.accountId, leadId: opts.leadId, kind });
@@ -39,6 +50,25 @@ export async function sendOutbound(opts: {
 
   const lead = await Lead.findOne({ _id: opts.leadId, accountId: opts.accountId });
   if (!lead) return { ok: false, status: 'failed', reason: 'lead_not_found' };
+
+  // Human-in-the-loop gate. Compliant + allowed, but if the account requires
+  // sign-off for this channel the message is parked (payload persisted) and the
+  // caller stops here; approving it later replays this exact send.
+  const gate = await requireApproval({
+    accountId: opts.accountId,
+    action: CHANNEL_APPROVAL[opts.channel],
+    title: `${opts.channel.toUpperCase()} to ${lead.firstName}${lead.lastName ? ` ${lead.lastName}` : ''}`,
+    summary: opts.text.slice(0, 200),
+    payload: { leadId: opts.leadId, channel: opts.channel, text: opts.text, subject: opts.subject, meta: opts.meta },
+    requestedBy: opts.requestedBy,
+    origin: (opts.meta?.kind as string) ?? 'outbound',
+    leadId: opts.leadId,
+    skip: opts.skipApproval,
+  });
+  if (gate.gated) {
+    await logMessage(opts, 'pending_approval', { approvalId: gate.approvalId });
+    return { ok: false, status: 'pending_approval', approvalId: gate.approvalId };
+  }
 
   let status: OutboundResult['status'] = 'failed';
   let reason: string | undefined;

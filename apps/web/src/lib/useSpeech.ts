@@ -33,7 +33,19 @@ function getRecognizer(): SpeechRecognitionLike | null {
  * dashboard language. Degrades gracefully — `supported: false` keeps the
  * typed command bar as the only input, never a crash.
  */
-export function useSpeech(onFinalTranscript: (text: string) => void): {
+export function useSpeech(
+  onFinalTranscript: (text: string) => void,
+  opts?: {
+    /**
+     * Fires when recognition ends ON ITS OWN with no final result — a silence
+     * timeout or a transient hiccup (no-speech / network / aborted). Lets a
+     * continuous surface (Voice Mode, the live demo call) re-open the mic so the
+     * ear never dies after one command. NOT fired on an explicit stop() or a
+     * permission denial.
+     */
+    onIdleEnd?: () => void;
+  },
+): {
   supported: boolean;
   listening: boolean;
   interim: string;
@@ -46,11 +58,20 @@ export function useSpeech(onFinalTranscript: (text: string) => void): {
   const recognizer = useRef<SpeechRecognitionLike | null>(null);
   const callback = useRef(onFinalTranscript);
   callback.current = onFinalTranscript;
+  const idleEnd = useRef(opts?.onIdleEnd);
+  idleEnd.current = opts?.onIdleEnd;
+  const manualStop = useRef(false); // did WE stop it (vs. it ending on its own)?
+  const gotFinal = useRef(false); // did this session produce a final transcript?
   const supported = typeof window !== 'undefined' && Boolean(getRecognizer);
   const [available] = useState(() => getRecognizer() !== null);
 
   const stop = useCallback(() => {
-    recognizer.current?.stop();
+    manualStop.current = true;
+    try {
+      recognizer.current?.stop();
+    } catch {
+      /* already stopped */
+    }
     setListening(false);
     setInterim('');
   }, []);
@@ -58,8 +79,14 @@ export function useSpeech(onFinalTranscript: (text: string) => void): {
   const start = useCallback(() => {
     const rec = getRecognizer();
     if (!rec) return;
-    recognizer.current?.abort();
+    try {
+      recognizer.current?.abort();
+    } catch {
+      /* ignore */
+    }
     recognizer.current = rec;
+    manualStop.current = false;
+    gotFinal.current = false;
     rec.lang = SPEECH_LANG[i18n.language] ?? 'en-US';
     rec.continuous = false;
     rec.interimResults = true;
@@ -75,6 +102,7 @@ export function useSpeech(onFinalTranscript: (text: string) => void): {
       }
       setInterim(interimText);
       if (finalText.trim()) {
+        gotFinal.current = true;
         callback.current(finalText.trim());
         setInterim('');
       }
@@ -82,16 +110,33 @@ export function useSpeech(onFinalTranscript: (text: string) => void): {
     rec.onend = () => {
       setListening(false);
       setInterim('');
+      // Ended on its own with nothing heard → let the caller keep the ear open.
+      if (!manualStop.current && !gotFinal.current) idleEnd.current?.();
     };
-    rec.onerror = () => {
+    rec.onerror = (ev) => {
       setListening(false);
       setInterim('');
+      // A denied mic is terminal; everything else (no-speech, network, aborted)
+      // is transient — keep the continuous loop alive.
+      const fatal = ev.error === 'not-allowed' || ev.error === 'service-not-allowed';
+      if (!manualStop.current && !fatal) idleEnd.current?.();
     };
-    rec.start();
-    setListening(true);
+    try {
+      rec.start();
+      setListening(true);
+    } catch {
+      // start() throws if a previous instance is still closing — onend/onerror
+      // from that instance will trigger a re-open, so just swallow it.
+    }
   }, [i18n.language]);
 
-  useEffect(() => () => recognizer.current?.abort(), []);
+  useEffect(() => () => {
+    try {
+      recognizer.current?.abort();
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   return { supported: supported && available, listening, interim, start, stop };
 }

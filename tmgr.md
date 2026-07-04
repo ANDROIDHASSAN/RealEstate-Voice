@@ -1,0 +1,161 @@
+- generic [ref=f7e3]:
+  - generic [ref=f7e4]:
+    - complementary [ref=f7e5]:
+      - img [ref=f7e7]
+      - link "Dashboard" [ref=f7e9] [cursor=pointer]:
+        - /url: /
+        - img [ref=f7e10]
+      - link "Leads" [ref=f7e13] [cursor=pointer]:
+        - /url: /leads
+        - img [ref=f7e14]
+      - link "Voice Agents" [ref=f7e19] [cursor=pointer]:
+        - /url: /voice
+        - img [ref=f7e20]
+      - link "Follow-up" [ref=f7e22] [cursor=pointer]:
+        - /url: /followup
+        - img [ref=f7e23]
+      - link "Inbox" [ref=f7e26] [cursor=pointer]:
+        - /url: /inbox
+        - img [ref=f7e27]
+      - link "Lead Engine" [ref=f7e30] [cursor=pointer]:
+        - /url: /lead-engine
+        - img [ref=f7e31]
+      - link "Content Studio" [ref=f7e38] [cursor=pointer]:
+        - /url: /content
+        - img [ref=f7e39]
+      - link "AI Team" [ref=f7e41] [cursor=pointer]:
+        - /url: /agents
+        - img [ref=f7e42]
+      - link "Property Intelligence" [ref=f7e45] [cursor=pointer]:
+        - /url: /property-intelligence
+        - img [ref=f7e46]
+      - link "Quotations" [ref=f7e50] [cursor=pointer]:
+        - /url: /quotations
+        - img [ref=f7e51]
+      - link "Invoicing" [ref=f7e54] [cursor=pointer]:
+        - /url: /invoicing
+        - img [ref=f7e55]
+      - link "Deals" [ref=f7e58] [cursor=pointer]:
+        - /url: /deals
+        - img [ref=f7e59]
+      - link "Ledger" [ref=f7e61] [cursor=pointer]:
+        - /url: /ledger
+        - img [ref=f7e62]
+      - link "Documents" [ref=f7e66] [cursor=pointer]:
+        - /url: /documents
+        - img [ref=f7e67]
+      - link "Website" [ref=f7e70] [cursor=pointer]:
+        - /url: /website
+        - img [ref=f7e71]
+      - link "Website CMS" [ref=f7e74] [cursor=pointer]:
+        - /url: /cms
+        - img [ref=f7e75]
+      - generic [ref=f7e79]:
+        - link "Team" [ref=f7e80] [cursor=pointer]:
+          - /url: /team
+          - img [ref=f7e81]
+        - link "Billing" [ref=f7e85] [cursor=pointer]:
+          - /url: /billing
+          - img [ref=f7e86]
+        - link "Settings" [ref=f7e88] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=f7e89]
+        - button "Log out" [ref=f7e92] [cursor=pointer]:
+          - img [ref=f7e93]
+        - generic [ref=f7e96]: A
+    - main [ref=f7e97]:
+      - generic [ref=f7e98]:
+        - paragraph [ref=f7e100]: Miami Luxe Realty
+        - generic [ref=f7e101]:
+          - button "Replay the tour" [ref=f7e102] [cursor=pointer]:
+            - img [ref=f7e103]
+          - button "🇺🇸 en" [ref=f7e108] [cursor=pointer]:
+            - img [ref=f7e109]
+            - generic [ref=f7e112]: 🇺🇸
+            - generic [ref=f7e113]: en
+          - generic [ref=f7e114]: ultimate
+          - link "A" [ref=f7e115] [cursor=pointer]:
+            - /url: /settings
+      - generic [ref=f7e116]:
+        - generic [ref=f7e117]:
+          - generic [ref=f7e118]:
+            - heading "Quotations & Proposals" [level=1] [ref=f7e119]
+            - paragraph [ref=f7e120]: Build branded quotes and proposals, send them, and track acceptance
+          - generic [ref=f7e121]:
+            - button "Templates" [ref=f7e122] [cursor=pointer]:
+              - img [ref=f7e123]
+              - text: Templates
+            - button "New Quote" [ref=f7e127] [cursor=pointer]:
+              - img [ref=f7e128]
+              - text: New Quote
+        - generic [ref=f7e129]:
+          - generic [ref=f7e130]:
+            - img [ref=f7e133]
+            - paragraph [ref=f7e136]: "0"
+            - paragraph [ref=f7e137]: Total quotes
+          - generic [ref=f7e138]:
+            - img [ref=f7e141]
+            - paragraph [ref=f7e144]: $0
+            - paragraph [ref=f7e145]: Pipeline value
+          - generic [ref=f7e146]:
+            - img [ref=f7e149]
+            - paragraph [ref=f7e152]: $0
+            - paragraph [ref=f7e153]: Accepted value
+          - generic [ref=f7e154]:
+            - img [ref=f7e157]
+            - paragraph [ref=f7e161]: 0%
+            - paragraph [ref=f7e162]: Acceptance rate
+        - generic [ref=f7e163]:
+          - generic [ref=f7e164]:
+            - heading "Quotes by status" [level=3] [ref=f7e165]
+            - paragraph [ref=f7e166]: No quotes yet
+          - generic [ref=f7e168]:
+            - heading "Commission calculator" [level=3] [ref=f7e169]:
+              - img [ref=f7e170]
+              - text: Commission calculator
+            - generic [ref=f7e174]:
+              - generic [ref=f7e175]:
+                - text: Sale price
+                - spinbutton "Sale price" [ref=f7e176]: "525000"
+              - generic [ref=f7e177]:
+                - text: Commission %
+                - spinbutton "Commission %" [ref=f7e178]: "3"
+              - generic [ref=f7e179]:
+                - text: Agent split %
+                - spinbutton "Agent split %" [ref=f7e180]: "70"
+              - generic [ref=f7e181]:
+                - text: Transaction fee
+                - spinbutton "Transaction fee" [ref=f7e182]: "395"
+            - generic [ref=f7e183]:
+              - generic [ref=f7e184]:
+                - generic [ref=f7e185]: Gross commission
+                - generic [ref=f7e186]: $15,750.00
+              - generic [ref=f7e187]:
+                - generic [ref=f7e188]: Brokerage cut
+                - generic [ref=f7e189]: $4,725.00
+              - generic [ref=f7e190]:
+                - generic [ref=f7e191]: Your net
+                - generic [ref=f7e192]: $10,630.00
+        - generic [ref=f7e193]:
+          - generic [ref=f7e194]:
+            - generic [ref=f7e195]:
+              - paragraph [ref=f7e196]: All quotes (0)
+              - generic [ref=f7e197]:
+                - img
+                - textbox "Search quotes…" [ref=f7e198]
+            - generic [ref=f7e199]:
+              - img [ref=f7e201]
+              - heading "Create your first quote" [level=3] [ref=f7e204]
+              - paragraph [ref=f7e205]: Pick a real-estate template — listing package, buyer representation, closing estimate — or start blank.
+              - button "New Quote" [ref=f7e207] [cursor=pointer]:
+                - img [ref=f7e208]
+                - text: New Quote
+          - generic [ref=f7e210]:
+            - img [ref=f7e212]
+            - heading "Select a quote" [level=3] [ref=f7e215]
+            - paragraph [ref=f7e216]: Choose a quote to preview it, export a branded PDF, send it, or mark it accepted.
+  - generic [ref=f7e217]:
+    - button "Voice Mode — run the app hands-free (Alt+V)" [ref=f7e218] [cursor=pointer]:
+      - img [ref=f7e220]
+    - button "TrueCode AI Assistant (Alt+K)" [ref=f7e221] [cursor=pointer]:
+      - img [ref=f7e222]

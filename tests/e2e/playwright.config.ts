@@ -20,10 +20,12 @@ export default defineConfig({
     ? undefined
     : [
         {
-          command: 'npx tsx apps/api/src/index.ts',
+          // Boot from the pre-built dist (node, no tsx compile) so cold starts are
+          // fast + reliable on a loaded box. Run `npm run build -w apps/api` first.
+          command: 'node apps/api/dist/index.js',
           url: 'http://localhost:4144/health',
           reuseExistingServer: false,
-          timeout: 120_000,
+          timeout: 240_000,
           cwd: '../..',
           env: {
             PORT: '4144',
@@ -39,7 +41,7 @@ export default defineConfig({
           command: 'npx vite --port 5199 --strictPort',
           url: 'http://localhost:5199',
           reuseExistingServer: false,
-          timeout: 120_000,
+          timeout: 240_000,
           cwd: '../../apps/web',
           env: { VITE_API_PROXY: 'http://localhost:4144' },
         },

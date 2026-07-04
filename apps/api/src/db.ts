@@ -26,18 +26,25 @@ function localDbPath(): string {
 export async function connectDb(): Promise<void> {
   if (env.mongoUri) {
     try {
-      await mongoose.connect(env.mongoUri, { serverSelectionTimeoutMS: 8000 });
+      // Fail fast (3s, not 8s) so a bad/placeholder URI doesn't stall boot and
+      // leave the web dev-proxy throwing ECONNREFUSED at a not-yet-listening API.
+      await mongoose.connect(env.mongoUri, {
+        serverSelectionTimeoutMS: 3000,
+        connectTimeoutMS: 3000,
+      });
       logger.info('MongoDB connected (configured URI)');
       return;
     } catch (err) {
-      // Never crash on a bad/missing key (PROMPT §17) — fall back, loudly.
-      logger.error(
-        { err: (err as Error).message },
-        'MONGO_URI unreachable/malformed — falling back to local MongoDB',
+      // Never crash on a bad/missing key (PROMPT §17) — this is an EXPECTED,
+      // recoverable fallback (e.g. the placeholder Atlas URI in .env), so log it
+      // as a warning, not an error, and continue on local Mongo.
+      logger.warn(
+        { reason: (err as Error).message },
+        'MONGO_URI not reachable — using local MongoDB instead (this is fine for local dev; set a valid MONGO_URI for a shared/cloud DB)',
       );
     }
   } else {
-    logger.warn('MONGO_URI empty — using local MongoDB');
+    logger.info('MONGO_URI not set — using local MongoDB (fine for local dev)');
   }
 
   // Local dev / tests fallback: real mongod (in-memory binary), optionally
@@ -45,7 +52,9 @@ export async function connectDb(): Promise<void> {
   const { MongoMemoryServer } = await import('mongodb-memory-server');
   const persist = shouldPersistLocalDb();
 
-  const instance: Record<string, unknown> = {};
+  // Give mongod up to 30s to start — cold starts on a busy CI/dev box can
+  // exceed the 10s default and spuriously fail the whole boot/test run.
+  const instance: Record<string, unknown> = { launchTimeout: 30_000 };
   if (persist) {
     const dbPath = localDbPath();
     mkdirSync(dbPath, { recursive: true });
@@ -63,7 +72,7 @@ export async function connectDb(): Promise<void> {
     instance.storageEngine = 'wiredTiger';
   }
 
-  const server = await MongoMemoryServer.create(persist ? { instance } : undefined);
+  const server = await MongoMemoryServer.create({ instance });
   memServer = server;
   await mongoose.connect(server.getUri('truecode'));
   logger.info({ persisted: persist }, persist ? 'MongoDB connected (local, persisted to disk)' : 'MongoDB connected (in-memory)');

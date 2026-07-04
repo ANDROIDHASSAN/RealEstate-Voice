@@ -3,7 +3,7 @@ import { Bot, Keyboard, Mic, PhoneOff, Send, Volume2, VolumeX } from 'lucide-rea
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../lib/api';
-import { speak, stopSpeaking, useSpeech } from '../../lib/useSpeech';
+import { speak, stopSpeaking, useMicLevel, useSpeech } from '../../lib/useSpeech';
 import { cn } from '../../lib/utils';
 
 interface Turn { role: 'user' | 'agent'; text: string }
@@ -12,12 +12,14 @@ type CallState = 'connecting' | 'idle' | 'listening' | 'thinking' | 'speaking';
 /**
  * Live browser call — talk to a voice agent with no phone / Vapi.
  *
- * PUSH-TO-TALK by design: the agent speaks its turn, then WAITS. You tap the mic
- * to reply; the mic is never open while (or right after) the agent is speaking,
- * so it can't hear its own TTS through the speakers and talk to itself. This
- * kills the echo/hallucination loop that "hands-free" auto-listen causes without
- * hardware echo cancellation. Degrades to typing where speech recognition is
- * unavailable (e.g. iOS Safari).
+ * HANDS-FREE by default (like a real call): the agent speaks, then the mic opens
+ * automatically for your reply — no tapping between turns, unlimited turns. The
+ * self-talk / echo loop is avoided the same proven way Voice Mode does it: the
+ * mic uses hardware echo cancellation (getUserMedia) and is only opened AFTER the
+ * agent's TTS finishes, while barge-in (talk over the agent to interrupt) is
+ * armed during speech. Tap the orb to interrupt; degrades to tap-to-talk if the
+ * mic is denied, and to typing where speech recognition is unavailable (iOS
+ * Safari / Firefox).
  */
 export function AgentDemo({ agentKey, agentName, onClose }: { agentKey: string; agentName: string; onClose: () => void }) {
   const { t, i18n } = useTranslation();
@@ -30,21 +32,67 @@ export function AgentDemo({ agentKey, agentName, onClose }: { agentKey: string; 
   const started = useRef(false);
   const voiceOnRef = useRef(true);
   const stateRef = useRef<CallState>('connecting');
+  const liveRef = useRef(true); // call still open (guards async callbacks after hang-up)
   voiceOnRef.current = voiceOn;
   stateRef.current = state;
 
   const secure = typeof window === 'undefined' || window.isSecureContext;
   const submitRef = useRef<(text: string) => void>(() => {});
-  const { supported: sttSupported, listening, interim, start, stop } = useSpeech((final) => submitRef.current(final));
+  const openMicRef = useRef<() => void>(() => {});
+
+  // Echo-cancelled mic for barge-in (and so auto-listen can't hear the agent).
+  const mic = useMicLevel();
+  const micRef = useRef(mic);
+  micRef.current = mic;
+
+  const { supported: sttSupported, listening, interim, start, stop } = useSpeech(
+    (final) => submitRef.current(final),
+    {
+      // Silence/hiccup while listening → re-open the ear so the line stays open,
+      // just like a real phone call. Never strands mid-call.
+      onIdleEnd: () => {
+        if (liveRef.current && stateRef.current === 'listening') {
+          window.setTimeout(() => {
+            if (liveRef.current && stateRef.current === 'listening') openMicRef.current();
+          }, 250);
+        }
+      },
+    },
+  );
 
   const setCall = (s: CallState) => { stateRef.current = s; setState(s); };
 
-  // The agent takes a turn: speak it, then WAIT for the user (no auto-listen).
+  // Open the mic for the user's turn (auto — no tap). Falls back to a manual
+  // "your turn" prompt if speech recognition or the mic is unavailable.
+  const openMic = useCallback(() => {
+    if (!liveRef.current) return;
+    if (!sttSupported) { setCall('idle'); return; }
+    stopSpeaking();
+    micRef.current.disarm();
+    setCall('listening');
+    start();
+  }, [sttSupported, start]);
+  openMicRef.current = openMic;
+
+  // The agent takes a turn: speak it, arm barge-in, then AUTO-open the mic when
+  // the speech ends. If muted, skip straight to listening.
   const agentSpeaks = useCallback((text: string) => {
     setCall('speaking');
-    if (voiceOnRef.current) speak(text, i18n.language, () => { if (stateRef.current === 'speaking') setCall('idle'); });
-    else setCall('idle');
-  }, [i18n.language]);
+    if (!voiceOnRef.current) { openMic(); return; }
+    // Barge-in: sustained speech energy while the agent talks cancels its TTS
+    // and hands the turn to the caller. Arm only after a 600ms grace so the
+    // agent's own opening words (even leaking past echo cancellation) can't
+    // self-trigger an interrupt.
+    micRef.current.onSpeech(() => { stopSpeaking(); openMic(); });
+    const graceId = window.setTimeout(() => {
+      if (liveRef.current && stateRef.current === 'speaking') micRef.current.arm();
+    }, 600);
+    speak(text, i18n.language, () => {
+      window.clearTimeout(graceId);
+      micRef.current.disarm();
+      if (liveRef.current && stateRef.current === 'speaking') openMic();
+    });
+  }, [i18n.language, openMic]);
 
   const send = useMutation({
     mutationFn: (messages: Turn[]) => api<{ reply: string }>(`/voice-agents/${agentKey}/demo`, { method: 'POST', body: { messages } }),
@@ -66,24 +114,18 @@ export function AgentDemo({ agentKey, agentName, onClose }: { agentKey: string; 
   }, [send, stop]);
   submitRef.current = submit;
 
-  // User taps the mic to speak. Always stop the agent's audio first so the mic
-  // never captures TTS.
-  const startListening = useCallback(() => {
-    if (!sttSupported) return;
-    stopSpeaking();
-    setCall('listening');
-    start();
-  }, [sttSupported, start]);
-
   const stopListening = useCallback(() => {
     stop();
     if (stateRef.current === 'listening') setCall('idle');
   }, [stop]);
 
-  // Connect: the agent greets and speaks, then waits for you to tap the mic.
+  // Connect: warm up the echo-cancelled mic, then the agent greets and the loop
+  // begins — mic auto-opens when the greeting finishes.
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    liveRef.current = true;
+    void micRef.current.ensure();
     api<{ reply: string }>(`/voice-agents/${agentKey}/demo`, { method: 'POST', body: { messages: [] } })
       .then((d) => { setTurns([{ role: 'agent', text: d.reply }]); agentSpeaks(d.reply); })
       .catch(() => { const g = t('demo.fallbackGreeting'); setTurns([{ role: 'agent', text: g }]); agentSpeaks(g); });
@@ -95,14 +137,22 @@ export function AgentDemo({ agentKey, agentName, onClose }: { agentKey: string; 
     return () => window.clearInterval(id);
   }, []);
 
-  const hangUp = useCallback(() => { stopSpeaking(); stop(); onClose(); }, [onClose, stop]);
-  useEffect(() => () => { stopSpeaking(); }, []);
+  const hangUp = useCallback(() => {
+    liveRef.current = false;
+    stopSpeaking();
+    stop();
+    micRef.current.disarm();
+    micRef.current.stopAll();
+    onClose();
+  }, [onClose, stop]);
+  useEffect(() => () => { liveRef.current = false; stopSpeaking(); micRef.current.stopAll(); }, []);
 
-  // Primary control (orb + mic button): interrupt while speaking, else toggle mic.
+  // Primary control (orb + mic button): interrupt while speaking (take the turn
+  // now), pause the mic while listening, else (re)open it.
   const onMicControl = () => {
-    if (state === 'speaking') { stopSpeaking(); setCall('idle'); return; }
+    if (state === 'speaking') { stopSpeaking(); openMic(); return; }
     if (state === 'listening') stopListening();
-    else startListening();
+    else openMic();
   };
 
   const lastAgent = [...turns].reverse().find((x) => x.role === 'agent')?.text ?? '';

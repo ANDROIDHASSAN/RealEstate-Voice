@@ -6,10 +6,10 @@ import {
   getLeadPersona,
   LEAD_PERSONAS,
 } from '@truecode/shared';
-import { getLLM } from '@truecode/integrations';
 import { logger } from '../logger.js';
 import { requireAuth } from '../middleware/auth.js';
 import { emitAgentEvent } from '../lib/events.js';
+import { getTracedLLM, withTrace } from '../lib/observability.js';
 import { getQueue, QUEUES } from '../lib/queue.js';
 import { sendOutbound } from '../lib/outbound.js';
 import { Account, Appointment, Lead, ScrapeJob } from '../models.js';
@@ -34,11 +34,26 @@ interface AssistantStep {
 }
 
 const PAGES: Record<string, string> = {
-  dashboard: '/', home: '/', leads: '/leads', voice: '/voice', calls: '/voice',
-  'follow-up': '/followup', followup: '/followup', inbox: '/inbox', messages: '/inbox',
-  'lead engine': '/lead-engine', 'lead-engine': '/lead-engine', scraper: '/lead-engine', prospecting: '/lead-engine',
-  content: '/content', agents: '/agents', team: '/agents', 'ai team': '/agents',
-  website: '/website', billing: '/billing', plans: '/billing', settings: '/settings',
+  dashboard: '/', home: '/', overview: '/', 'home page': '/',
+  leads: '/leads', 'my leads': '/leads', pipeline: '/leads', contacts: '/leads',
+  voice: '/voice', calls: '/voice', 'voice agents': '/voice', 'voice agent': '/voice', calling: '/voice', phone: '/voice',
+  'follow-up': '/followup', followup: '/followup', 'follow up': '/followup', nurture: '/followup',
+  inbox: '/inbox', messages: '/inbox', conversations: '/inbox', chats: '/inbox',
+  'lead engine': '/lead-engine', 'lead-engine': '/lead-engine', scraper: '/lead-engine', prospecting: '/lead-engine', 'find leads': '/lead-engine', prospects: '/lead-engine',
+  content: '/content', 'content studio': '/content', social: '/content', posts: '/content',
+  agents: '/agents', team: '/agents', 'ai team': '/agents', crew: '/agents', 'agent team': '/agents',
+  'property intelligence': '/property-intelligence', 'property-intelligence': '/property-intelligence', property: '/property-intelligence', 'investment analysis': '/property-intelligence', analysis: '/property-intelligence',
+  quotations: '/quotations', quotes: '/quotations', quote: '/quotations', proposals: '/quotations',
+  invoicing: '/invoicing', invoices: '/invoicing', invoice: '/invoicing', billing_docs: '/invoicing',
+  deals: '/deals', 'deal pipeline': '/deals', kanban: '/deals',
+  ledger: '/ledger', accounting: '/ledger', 'income and expenses': '/ledger', books: '/ledger',
+  documents: '/documents', docs: '/documents', agreements: '/documents', contracts: '/documents', 'e-sign': '/documents',
+  cms: '/cms', 'website cms': '/cms', 'site editor': '/cms', 'edit website': '/cms',
+  website: '/website', site: '/website', 'my website': '/website',
+  members: '/team', staff: '/team', 'my team': '/team',
+  billing: '/billing', plans: '/billing', plan: '/billing', subscription: '/billing', upgrade: '/billing',
+  settings: '/settings', 'api keys': '/settings', integrations: '/settings', keys: '/settings', config: '/settings',
+  admin: '/admin', 'super admin': '/admin',
 };
 
 const LOCALES: Record<string, string> = {
@@ -131,12 +146,26 @@ assistantRouter.get('/context', async (req: Request, res: Response) => {
 // Command → plan → execute.
 // ---------------------------------------------------------------------------
 
-assistantRouter.post('/command', async (req: Request, res: Response) => {
-  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
-  const page = typeof req.body?.page === 'string' ? req.body.page : undefined;
-  const locale = typeof req.body?.locale === 'string' ? req.body.locale : 'en';
-  if (!text || text.length > 1000) return res.status(400).json({ error: 'invalid_input' });
-  const accountId = req.auth!.accountId;
+export interface AssistantResult {
+  plan: string[];
+  reply: string;
+  steps: AssistantStep[];
+  clientAction?: Record<string, unknown>;
+  clientActions: Record<string, unknown>[];
+  llm: { name: string; live: boolean; reason?: string };
+}
+
+/**
+ * The assistant command pipeline: plan (LLM or deterministic) → execute each
+ * step through the same gated paths as the UI. Exported so both the HTTP route
+ * and the eval harness (assistant-target cases) run the exact same code path.
+ */
+export async function runAssistantCommand(
+  accountId: string,
+  text: string,
+  opts: { page?: string; locale?: string } = {},
+): Promise<AssistantResult> {
+  const { page, locale = 'en' } = opts;
 
   emitAgentEvent(accountId, {
     type: 'assistant',
@@ -147,7 +176,7 @@ assistantRouter.post('/command', async (req: Request, res: Response) => {
   });
 
   const context = await buildContext(accountId, page);
-  const llm = getLLM();
+  const llm = getTracedLLM();
   let plan = llm.info.live ? await planWithLLM(text, context, locale) : null;
   if (!plan) plan = planDeterministic(text, context);
 
@@ -180,14 +209,30 @@ assistantRouter.post('/command', async (req: Request, res: Response) => {
   // Prefer a single navigate/language action for the client; refreshes merge.
   const primary = clientActions.find((a) => a.type === 'navigate' || a.type === 'set_language' || a.type === 'orchestrate');
 
-  return res.json({
+  return {
     plan: plan.steps.map((s) => s.action),
     reply: finalReply || "Done. Here's what I did — check the activity feed.",
     steps,
     clientAction: primary,
     clientActions,
     llm: llm.info,
-  });
+  };
+}
+
+assistantRouter.post('/command', async (req: Request, res: Response) => {
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  const page = typeof req.body?.page === 'string' ? req.body.page : undefined;
+  const locale = typeof req.body?.locale === 'string' ? req.body.locale : 'en';
+  if (!text || text.length > 1000) return res.status(400).json({ error: 'invalid_input' });
+  const accountId = req.auth!.accountId;
+
+  // Every command is a traced run (latency, LLM cost, replay in Observability).
+  const result = await withTrace(
+    { accountId, kind: 'assistant', name: `Assistant: ${text.slice(0, 60)}`, input: { text, page, locale }, replayable: true },
+    () => runAssistantCommand(accountId, text, { page, locale }),
+  );
+
+  return res.json(result);
 });
 
 type PlannedAction = { action: string; params: Record<string, unknown>; reply: string };
@@ -195,7 +240,7 @@ type Plan = { steps: PlannedAction[]; reply: string };
 
 async function planWithLLM(text: string, context: AssistantContext, locale: string): Promise<Plan | null> {
   try {
-    const out = await getLLM().complete(
+    const out = await getTracedLLM().complete(
       `USER COMMAND: "${text}"\n\nACCOUNT CONTEXT (JSON):\n${JSON.stringify(context)}`,
       {
         json: true,
@@ -208,7 +253,8 @@ async function planWithLLM(text: string, context: AssistantContext, locale: stri
           'Decompose the command into an ORDERED PLAN of one or more steps and return ONLY JSON:',
           '{"steps":[{"action":<action>,"params":{...},"reply":"<short note>"}],"reply":"<overall confirmation, in the user locale, summarising what you did AND anything you could not do and why>"}',
           'Actions and params:',
-          'navigate {path: one of / /leads /voice /followup /inbox /lead-engine /content /agents /website /billing /settings}',
+          'navigate {path: one of / /leads /voice /followup /inbox /lead-engine /content /agents /property-intelligence /quotations /invoicing /deals /ledger /documents /cms /website /team /billing /settings}  — pick the page that best matches ANY request to see/open/go to a section.',
+          'list_leads {filter?:{status?, source?, location?, recent?, all?}}  — when the user wants to SEE / list / review their existing leads ("show me my leads", "give me all the leads", "who are my new leads"). Read the CONTEXT.recentLeads + counts, name a few in reply, and it navigates to /leads. Use this, NOT clarify, for any "show/list my leads" request.',
           'create_lead {firstName, lastName?, phone?, email?, location?, budget?, intent?}',
           `start_scrape {personaKey? one of [${LEAD_PERSONAS.map((p) => p.key).join(', ')}], query?, city?, country?, source?, maxResults?}`,
           'trigger_call {leadName, agentKey?}  — one named lead',
@@ -281,9 +327,19 @@ function parseClause(t: string, context: AssistantContext, scrapedThisTurn: bool
     }
   }
 
-  // questions about their data
-  if (/how many|count|what.?s my|whats my|do i have|show me the number/.test(t)) {
+  // questions about their data ("how many leads do I have?")
+  if (/how many|count|do i have|show me the number/.test(t)) {
     return { action: 'answer', params: { question: t }, reply: '' };
+  }
+
+  // list / browse existing leads: "show me my leads", "give me all the leads",
+  // "list leads", "what are my leads", "who are my new leads", "see the pipeline"
+  if (
+    /\b(leads?|prospects?|pipeline|contacts?|clients?)\b/.test(t) &&
+    /^(?:give me|show(?: me)?|list|see|view|display|pull up|bring up|get me|open up|let me see|what(?:'s| is| are| do)|who(?:'s| are| is)|can (?:you|i) see|i want (?:to see|all))/.test(t) &&
+    !/\bin\s+[a-z' ]+$/.test(t) // "...leads in Miami" at the very end is a scrape/find, not a browse
+  ) {
+    return { action: 'list_leads', params: { filter: filterFromPhrase(t, false) }, reply: '' };
   }
 
   // navigate
@@ -379,6 +435,37 @@ async function executeAction(
 
     case 'answer':
       return { reply: action.reply || answerFromContext(String(p.question ?? ''), context) };
+
+    case 'list_leads': {
+      if (context.totalLeads === 0) {
+        return {
+          reply: "You don't have any leads yet. Open the Lead Engine and I'll go find some for you.",
+          clientAction: { type: 'navigate', path: '/lead-engine' },
+        };
+      }
+      const filter = (p.filter as Record<string, unknown>) ?? {};
+      let pool = context.recentLeads.filter((l) => l.name);
+      if (filter.status) pool = pool.filter((l) => l.status === String(filter.status));
+      if (filter.location) pool = pool.filter((l) => (l.location ?? '').toLowerCase().includes(String(filter.location).toLowerCase()));
+      const named = pool.slice(0, 6).map((l) => `${l.name} (${l.status})`);
+      const breakdown = Object.entries(context.leadCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([s, n]) => `${n} ${s}`)
+        .join(', ');
+      steps.push({
+        agentKey: 'lead-scorer',
+        title: `Pulled ${context.totalLeads} leads`,
+        detail: breakdown || undefined,
+        status: 'done',
+      });
+      const listPart = named.length
+        ? ` The most recent: ${named.join('; ')}.`
+        : ' Opening the full list.';
+      return {
+        reply: `You have ${context.totalLeads} lead${context.totalLeads === 1 ? '' : 's'}${breakdown ? ` — ${breakdown}` : ''}.${listPart} I'm opening the Leads page so you can see them all.`,
+        clientAction: { type: 'navigate', path: '/leads' },
+      };
+    }
 
     case 'clarify':
       return {};
@@ -553,9 +640,20 @@ function answerFromContext(question: string, ctx: AssistantContext): string {
 function dedupeFragments(fragments: string[]): string {
   const kept: string[] = [];
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+  const tokens = (s: string) => new Set(norm(s).split(/\s+/).filter((w) => w.length > 2));
   for (const f of fragments.map((s) => s.trim()).filter(Boolean)) {
     const nf = norm(f);
-    if (kept.some((k) => { const nk = norm(k); return nk.includes(nf) || nf.includes(nk); })) continue;
+    const tf = tokens(f);
+    const restates = kept.some((k) => {
+      const nk = norm(k);
+      if (nk.includes(nf) || nf.includes(nk)) return true;
+      // High word overlap → the LLM's prose restated a step's summary; keep one.
+      const tk = tokens(k);
+      const inter = [...tf].filter((w) => tk.has(w)).length;
+      const overlap = inter / Math.min(tf.size, tk.size || 1);
+      return overlap >= 0.6;
+    });
+    if (restates) continue;
     kept.push(f);
   }
   return kept.join(' ');

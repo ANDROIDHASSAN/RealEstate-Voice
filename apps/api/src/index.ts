@@ -5,7 +5,10 @@ import { env } from './env.js';
 import { logger } from './logger.js';
 import { applyStoredIntegrationKeys } from './routes/integrations.js';
 import { seedDemo } from './seed.js';
+import { registerApprovalExecutors } from './lib/approval-executors.js';
+import { registerAdWorkers } from './workers/ads.js';
 import { registerContentWorkers } from './workers/content.js';
+import { registerEvalWorkers } from './workers/evals.js';
 import { registerDripWorker } from './workers/drip.js';
 import { registerInstantReplyWorker } from './workers/instant-reply.js';
 import { registerLeadEngineWorkers } from './workers/lead-engine.js';
@@ -33,7 +36,10 @@ async function main(): Promise<void> {
   registerDripWorker();
   registerLeadEngineWorkers();
   registerContentWorkers();
+  registerAdWorkers();
   registerPropertyAnalysisWorker();
+  registerEvalWorkers();
+  registerApprovalExecutors();
 
   const app = createApp();
   app.listen(env.port, () => {

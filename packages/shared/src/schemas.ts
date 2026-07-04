@@ -100,6 +100,7 @@ export const assistantCommandSchema = z.object({
 /** Actions the assistant is allowed to execute — a closed, auditable set. */
 export const ASSISTANT_ACTIONS = [
   'navigate',
+  'list_leads',
   'create_lead',
   'start_scrape',
   'trigger_call',
@@ -130,7 +131,21 @@ export const assistantPlanSchema = z.object({
 
 /** Per-provider API-key payload saved from Settings. Values are write-only. */
 export const integrationKeysSchema = z.object({
-  provider: z.enum(['twilio', 'whatsapp', 'resend', 'llm', 'stripe', 'apify', 'instagram', 'video', 'voice']),
+  provider: z.enum([
+    'twilio',
+    'whatsapp',
+    'resend',
+    'llm',
+    'stripe',
+    'apify',
+    'instagram',
+    'video',
+    'voice',
+    'facebook',
+    'youtube',
+    'metaAds',
+    'storage',
+  ]),
   values: z.record(z.string().max(500)),
 });
 

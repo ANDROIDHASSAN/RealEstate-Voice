@@ -1,38 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bot, Mic, MicOff, Send, Sparkles, Volume2, VolumeX, X } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { AudioLines, Bot, Mic, Send, Sparkles, Volume2, VolumeX, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
-import { setLocale } from '../../lib/i18n';
+import { AssistantStep, useAssistantCommand } from '../../lib/useAssistantCommand';
 import { speak, useSpeech } from '../../lib/useSpeech';
 import { cn } from '../../lib/utils';
 import { Badge } from '../ui/badge';
-
-interface AssistantStep {
-  agentKey: string;
-  title: string;
-  detail?: string;
-  status: 'done' | 'error' | 'blocked';
-}
-
-interface ClientAction {
-  type: string;
-  path?: string;
-  locale?: string;
-  entity?: string;
-  leadId?: string;
-  goal?: string;
-}
-
-interface AssistantResponse {
-  plan: string[];
-  reply: string;
-  steps: AssistantStep[];
-  clientAction?: ClientAction;
-  clientActions?: ClientAction[];
-  llm: { name: string; live: boolean };
-}
+import { VoiceMode } from './VoiceMode';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -47,10 +22,8 @@ interface ChatMessage {
  */
 export function CommandCenter() {
   const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [input, setInput] = useState('');
   const [voiceReplies, setVoiceReplies] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -64,32 +37,10 @@ export function CommandCenter() {
     staleTime: 30_000,
   });
 
-  const command = useMutation({
-    mutationFn: (text: string) =>
-      api<AssistantResponse>('/assistant/command', {
-        method: 'POST',
-        body: { text, page: location.pathname, locale: i18n.language },
-      }),
-    onSuccess: (d) => {
+  const command = useAssistantCommand({
+    onReply: (d) => {
       setMessages((prev) => [...prev, { role: 'assistant', text: d.reply, steps: d.steps }]);
       if (voiceReplies) speak(d.reply, i18n.language);
-      // Execute every client action the plan produced (refreshes, then one nav).
-      const actions = d.clientActions?.length ? d.clientActions : d.clientAction ? [d.clientAction] : [];
-      let navigated = false;
-      for (const ca of actions) {
-        if (ca.type === 'set_language' && ca.locale) setLocale(ca.locale);
-        if (ca.type === 'refresh') void qc.invalidateQueries();
-        if (ca.type === 'orchestrate' && ca.leadId) {
-          navigate('/agents');
-          navigated = true;
-          void api('/orchestrator/run', { method: 'POST', body: { leadId: ca.leadId, goal: ca.goal ?? 'move this lead forward' } })
-            .then(() => qc.invalidateQueries({ queryKey: ['agent-runs'] }))
-            .catch(() => undefined);
-        }
-      }
-      // A single navigate wins last so the user lands where the work happened.
-      const nav = actions.find((a) => a.type === 'navigate' && a.path);
-      if (nav?.path && !navigated) navigate(nav.path);
     },
     onError: () => {
       setMessages((prev) => [...prev, { role: 'assistant', text: t('assistant.error') }]);
@@ -113,12 +64,16 @@ export function CommandCenter() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, command.isPending]);
 
-  // Alt+K opens the assistant from anywhere.
+  // Alt+K opens the typed assistant, Alt+V drops into hands-free Voice Mode.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.altKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setOpen((v) => !v);
+      }
+      if (e.altKey && e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        setVoiceOpen(true);
       }
     };
     window.addEventListener('keydown', handler);
@@ -127,18 +82,18 @@ export function CommandCenter() {
 
   return (
     <>
-      {/* Floating launcher — mic ring animates while listening */}
+      {/* Floating launcher — hands-free Voice Mode + the typed assistant */}
       <div className="fixed bottom-24 z-50 flex flex-col items-end gap-3 ltr:right-5 rtl:left-5 md:bottom-6">
         {supported && (
           <button
-            onClick={() => (listening ? stop() : start())}
-            title={t('assistant.voiceHint')}
-            className={cn(
-              'flex h-12 w-12 items-center justify-center rounded-full shadow-soft transition-all',
-              listening ? 'cf-mic-live bg-card-pink text-ink' : 'bg-surface text-ink hover:scale-105',
-            )}
+            onClick={() => setVoiceOpen(true)}
+            title={`${t('voiceMode.launch')} (Alt+V)`}
+            data-tour="voice-mode"
+            className="group relative flex h-14 w-14 items-center justify-center rounded-full text-ink shadow-soft transition-transform hover:scale-105"
+            style={{ background: 'linear-gradient(135deg, var(--card-purple), var(--card-blue))' }}
           >
-            {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            <span className="absolute inset-0 rounded-full cf-mic-live opacity-0 group-hover:opacity-100" />
+            <AudioLines className="h-6 w-6" />
           </button>
         )}
         <button
@@ -150,6 +105,8 @@ export function CommandCenter() {
           {open ? <X className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
         </button>
       </div>
+
+      <VoiceMode open={voiceOpen} onClose={() => setVoiceOpen(false)} />
 
       {open && (
         <div className="fixed bottom-40 z-50 flex max-h-[70vh] w-[min(420px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-card bg-surface shadow-soft ltr:right-5 rtl:left-5 md:bottom-24">

@@ -4,31 +4,54 @@
  */
 import './env.js';
 import bcrypt from 'bcryptjs';
-import { computeTotals, docTemplate, modulesForPlan, orchestrate, quoteTemplate, type PropertyInput } from '@truecode/shared';
+import { computeTotals, DEFAULT_EVAL_CASES, DEFAULT_QUOTE_CATEGORIES, docTemplate, modulesForPlan, orchestrate, quoteTemplate, type PropertyInput } from '@truecode/shared';
 import { connectDb, disconnectDb } from './db.js';
 import {
   Account,
+  AgentOpsConfig,
   Appointment,
+  Approval,
   Call,
   CmsContent,
   Compliance,
   Conversation,
   Deal,
   DocumentRecord,
+  EvalCase,
+  EvalRun,
+  EvalScore,
   Invoice,
   Lead,
   LedgerEntry,
   PropertyAnalysis,
   Quote,
+  QuoteSettings,
+  QuoteTemplateDoc,
   Sequence,
   SiteConfig,
+  Trace,
   User,
 } from './models.js';
 
 export async function seedDemo(): Promise<{ accountId: string }> {
   const email = 'demo@truecode.ai';
   const existing = await User.findOne({ email });
-  if (existing) return { accountId: String(existing.accountId) };
+  if (existing) {
+    // Reconcile the demo account's modules with its plan so features added to a
+    // plan later (e.g. the Content Studio `ads` module) light up on next boot.
+    // Union only — never removes a manually-granted module.
+    const account = await Account.findById(existing.accountId).select('plan enabledModules');
+    if (account) {
+      const want = modulesForPlan((account.plan as 'starter' | 'pro' | 'empire' | 'ultimate') ?? 'empire');
+      const have = new Set(account.enabledModules as string[]);
+      const missing = want.filter((m) => !have.has(m));
+      if (missing.length) {
+        account.enabledModules = [...have, ...missing];
+        await account.save();
+      }
+    }
+    return { accountId: String(existing.accountId) };
+  }
 
   const account = await Account.create({
     name: 'Miami Luxe Realty',
@@ -213,10 +236,42 @@ export async function seedDemo(): Promise<{ accountId: string }> {
       terms: q.tpl.terms,
       validUntil: new Date(Date.now() + 30 * 24 * 3600 * 1000),
       status: q.status,
+      accentColor: '#111111',
       sentAt: q.status !== 'draft' ? new Date() : undefined,
       respondedAt: q.status === 'accepted' ? new Date() : undefined,
     });
   }
+
+  // Quote settings — managed categories + branding defaults for the builder.
+  await QuoteSettings.create({
+    accountId: account._id,
+    categories: [...DEFAULT_QUOTE_CATEGORIES, 'Drone & Aerial', 'Print & Mailers', 'Legal'],
+    accentColor: '#111111',
+    defaultCurrency: 'USD',
+    defaultTaxRatePct: 7,
+    defaultValidDays: 30,
+    defaultTerms: 'This proposal is valid for the period noted above. Prices are exclusive of applicable taxes.',
+    defaultNotes: '',
+  });
+
+  // A ready-made custom template to showcase the "your templates" gallery.
+  await QuoteTemplateDoc.create({
+    accountId: account._id,
+    name: 'Luxury Launch Campaign',
+    description: 'White-glove marketing launch for a luxury listing.',
+    category: 'Signature',
+    accentColor: '#8A6BE0',
+    currency: 'USD',
+    defaultTaxRatePct: 7,
+    terms: 'Campaign fees are billed 50% up front and 50% at closing.',
+    lineItems: [
+      { description: 'Editorial photography & twilight shoot', category: 'Photography', quantity: 1, unitPrice: 900 },
+      { description: 'Cinematic property film', category: 'Marketing', quantity: 1, unitPrice: 1500 },
+      { description: 'Branded microsite + domain', category: 'Marketing', quantity: 1, unitPrice: 650 },
+      { description: 'Private broker preview event', category: 'Marketing', quantity: 1, unitPrice: 1200, optional: true },
+      { description: 'Targeted digital ad spend', category: 'Marketing', unit: 'mo', quantity: 2, unitPrice: 750 },
+    ],
+  });
 
   // Team members (RBAC demo) + a platform super admin.
   await User.create({
@@ -320,7 +375,112 @@ export async function seedDemo(): Promise<{ accountId: string }> {
     blocks: [{ id: 'b1', type: 'richtext', data: { heading: 'Start with pre-approval', body: 'Getting pre-approved tells you exactly what you can afford and makes your offer stronger.\n\nWork with a local lender who understands the Miami market.' } }],
   });
 
+  await seedAgentOps(String(account._id));
+
   return { accountId: String(account._id) };
+}
+
+/**
+ * AgentOps demo data — makes Evals / Observability / Approvals alive on first
+ * login: a scored-call trend, real traces, a couple of parked approvals, and a
+ * showcase policy (risky actions gated; routine sends left open).
+ */
+async function seedAgentOps(accountId: string): Promise<void> {
+  const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 24 * 3600 * 1000);
+
+  // Policy: gate the money/irreversible actions, keep routine sends flowing.
+  await AgentOpsConfig.create({
+    accountId,
+    approvalPolicy: { ad_launch: true, stripe_charge: true, delete_record: true, bulk_outbound: true, voice_call: false, send_sms: false, send_whatsapp: false, send_email: false },
+    selfCorrect: { enabled: true, threshold: 70, maxAttempts: 1 },
+  });
+
+  // Eval cases (the two seed suites).
+  await EvalCase.insertMany(DEFAULT_EVAL_CASES.map((c) => ({ ...c, accountId })));
+
+  // A production score trend across the last week.
+  const scoreSeed = [
+    { d: 6, overall: 71, pass: true, agentKey: 'buyer-qualifier', verdict: 'Solid discovery, booked the consult.' },
+    { d: 5, overall: 64, pass: false, agentKey: 'speed-to-lead', verdict: 'Rushed discovery; missed timeline — self-corrected.', corrected: true },
+    { d: 5, overall: 88, pass: true, agentKey: 'buyer-qualifier-es', verdict: 'Excellent Spanish qualification and booking.' },
+    { d: 3, overall: 76, pass: true, agentKey: 'appointment-booker', verdict: 'Clear next step, good rapport.' },
+    { d: 2, overall: 59, pass: false, agentKey: 'speed-to-lead', verdict: 'Talked over the lead; weak objection handling.' },
+    { d: 1, overall: 82, pass: true, agentKey: 'buyer-qualifier', verdict: 'Grounded answers, no overpromising.' },
+    { d: 0, overall: 90, pass: true, agentKey: 'buyer-qualifier-es', verdict: 'Top-tier: budget, timeline, motivation all captured.' },
+  ];
+  for (const s of scoreSeed) {
+    const doc = await EvalScore.create({
+      accountId, suite: 'production', target: 'call', agentKey: s.agentKey,
+      overall: s.overall, pass: s.pass, corrected: s.corrected ?? false,
+      criteria: [
+        { key: 'goalCompletion', score: s.overall, reason: 'Outcome vs. call goal.' },
+        { key: 'compliance', score: Math.min(100, s.overall + 6), reason: 'Disclosure + honored objections.' },
+      ],
+      verdict: s.verdict, judge: 'heuristic',
+    });
+    await EvalScore.collection.updateOne({ _id: doc._id }, { $set: { createdAt: iso(s.d), updatedAt: iso(s.d) } });
+  }
+
+  // Two done suite runs so the suite cards show a last result.
+  await EvalRun.create({
+    accountId, suite: 'regression', status: 'done', total: 4, passed: 4, failed: 0, passRate: 100, avgScore: 84,
+    startedAt: iso(1).toISOString(), durationMs: 4200,
+    results: [], note: 'All safety rails holding.',
+  });
+  await EvalRun.create({
+    accountId, suite: 'capability', status: 'done', total: 3, passed: 2, failed: 1, passRate: 67, avgScore: 74,
+    startedAt: iso(1).toISOString(), durationMs: 6100, results: [],
+  });
+
+  // A few observability traces.
+  const traceSeed = [
+    {
+      kind: 'assistant', name: 'Assistant: find luxury buyers in Miami and email them', status: 'ok', replayable: true,
+      input: { text: 'find luxury buyers in Miami and email them', locale: 'en' }, dur: 1840,
+      spans: [
+        { id: 's1', name: 'LLM · gemini-2.0-flash', type: 'llm', startedAt: iso(0).toISOString(), durationMs: 1420, status: 'ok', provider: 'Gemini', model: 'gemini-2.0-flash', tokensIn: 780, tokensOut: 210, costUsd: 0.000162, meta: {} },
+        { id: 's2', name: 'Scrape queued', type: 'tool', startedAt: iso(0).toISOString(), durationMs: 40, status: 'ok', meta: {} },
+      ],
+    },
+    {
+      kind: 'call', name: 'Call · buyer-qualifier-es', status: 'ok', replayable: false, dur: 212000,
+      spans: [
+        { id: 't1', name: 'agent turn', type: 'voice', startedAt: iso(0).toISOString(), durationMs: 0, status: 'ok', tokensOut: 24, meta: { text: 'Hola Carlos, ¿sigue buscando comprar?' } },
+        { id: 't2', name: 'lead turn', type: 'voice', startedAt: iso(0).toISOString(), durationMs: 0, status: 'ok', tokensIn: 12, meta: { text: 'Sí, en Brickell.' } },
+        { id: 't3', name: 'Judge · heuristic', type: 'judge', startedAt: iso(0).toISOString(), durationMs: 5, status: 'ok', meta: { overall: 88 } },
+      ],
+    },
+    {
+      kind: 'eval', name: 'Auto-score call · speed-to-lead', status: 'error', replayable: false, dur: 900,
+      spans: [{ id: 'e1', name: 'Judge · heuristic', type: 'judge', startedAt: iso(2).toISOString(), durationMs: 6, status: 'ok', meta: { overall: 59 } }],
+    },
+  ] as const;
+  for (const tr of traceSeed) {
+    const totalTokens = tr.spans.reduce((s, sp) => s + ((sp as { tokensIn?: number }).tokensIn ?? 0) + ((sp as { tokensOut?: number }).tokensOut ?? 0), 0);
+    const totalCostUsd = tr.spans.reduce((s, sp) => s + ((sp as { costUsd?: number }).costUsd ?? 0), 0);
+    const doc = await Trace.create({
+      accountId, kind: tr.kind, name: tr.name, status: tr.status, replayable: tr.replayable,
+      input: 'input' in tr ? tr.input : undefined, startedAt: tr.spans[0]?.startedAt, durationMs: tr.dur,
+      totalTokens, totalCostUsd, spans: tr.spans,
+    });
+    await Trace.collection.updateOne({ _id: doc._id }, { $set: { createdAt: iso(tr.kind === 'eval' ? 2 : 0) } });
+  }
+
+  // Parked approvals awaiting the owner.
+  await Approval.create([
+    {
+      accountId, action: 'ad_launch', title: 'Launch ad: Brickell Luxury Buyers', summary: '$75/day × 7 days on meta',
+      risk: 'high', status: 'pending', origin: 'content/ads', payload: { campaignId: 'demo-campaign' },
+    },
+    {
+      accountId, action: 'bulk_outbound', title: 'SMS to 42 new leads', summary: 'New listing alert — Coral Gables open house Saturday.',
+      risk: 'high', status: 'pending', origin: 'assistant', payload: { leadIds: [], channel: 'sms', text: 'New listing alert.' },
+    },
+    {
+      accountId, action: 'send_email', title: 'Email to Jennifer Wu', summary: 'Follow-up with three Miami Beach matches.',
+      risk: 'low', status: 'executed', origin: 'self-correct', decidedAt: iso(1), result: { status: 'mock-sent' },
+    },
+  ]);
 }
 
 // Run directly: npm run seed

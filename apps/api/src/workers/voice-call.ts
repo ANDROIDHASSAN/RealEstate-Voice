@@ -3,11 +3,13 @@ import { buildSalesSystemPrompt, getVoiceAgent, voiceAgentForLocale, type Locale
 import { logger } from '../logger.js';
 import { complianceCheck } from '../lib/compliance.js';
 import { emitAgentEvent } from '../lib/events.js';
+import { saveTrace } from '../lib/observability.js';
 import { retrieve, toContextBlock } from '../lib/knowledge.js';
 import { getEffectiveAgent } from '../lib/agent-config.js';
 import { mergeFields } from '../lib/merge.js';
 import { getQueue, QUEUES } from '../lib/queue.js';
 import { sendOutbound } from '../lib/outbound.js';
+import { estimateTokens } from '@truecode/shared';
 import { template } from '../lib/templates.js';
 import { Account, Appointment, Call, Lead, UsageLedger } from '../models.js';
 
@@ -217,4 +219,29 @@ export async function handleVoiceProviderEvent(result: VoiceCallResult): Promise
     status: result.status === 'failed' ? 'error' : 'done',
   });
   logger.info({ callId: String(call._id), outcome: result.outcome }, 'voice call completed');
+
+  // Observability: persist a durable trace for the call (turns → spans).
+  const transcript = (result.transcript ?? []) as { role?: string; text?: string; ts?: number }[];
+  const spans = transcript.slice(0, 40).map((turn, i) => {
+    const tokens = estimateTokens(turn.text);
+    return {
+      id: `turn_${i}`,
+      name: `${turn.role ?? 'agent'} turn`,
+      type: 'voice' as const,
+      startedAt: new Date().toISOString(),
+      durationMs: 0,
+      status: 'ok' as const,
+      tokensOut: turn.role === 'agent' ? tokens : undefined,
+      tokensIn: turn.role === 'lead' ? tokens : undefined,
+      meta: { text: (turn.text ?? '').slice(0, 200) },
+    };
+  });
+  await saveTrace(
+    { accountId, kind: 'call', name: `Call · ${call.agentKey}`, refId: String(call._id) },
+    spans,
+    { status: result.status === 'failed' ? 'error' : 'ok', durationMs: result.durationSec * 1000 },
+  );
+
+  // Eval: auto-score every completed call by the LLM-judge (→ self-correction).
+  await getQueue().enqueue(QUEUES.eval, { kind: 'score-call', callId: String(call._id) });
 }

@@ -8,6 +8,7 @@ import {
   HelpCircle,
   Building2,
   FileSignature,
+  Gauge,
   Home,
   Inbox,
   KanbanSquare,
@@ -19,7 +20,9 @@ import {
   Scale,
   Settings,
   Shield,
+  ShieldCheck,
   Sparkles,
+  TestTube2,
   Users,
   Users2,
 } from 'lucide-react';
@@ -58,6 +61,9 @@ const NAV: NavItem[] = [
   { to: '/documents', icon: FileSignature, labelKey: 'nav.documents', module: 'documents' },
   { to: '/website', icon: Globe, labelKey: 'nav.website', module: 'website' },
   { to: '/cms', icon: LayoutTemplate, labelKey: 'nav.cms', module: 'cms' },
+  { to: '/evals', icon: TestTube2, labelKey: 'nav.evals', module: 'agentOps' },
+  { to: '/observability', icon: Gauge, labelKey: 'nav.observability', module: 'agentOps' },
+  { to: '/approvals', icon: ShieldCheck, labelKey: 'nav.approvals', module: 'agentOps' },
 ];
 
 const FOOTER_NAV: NavItem[] = [

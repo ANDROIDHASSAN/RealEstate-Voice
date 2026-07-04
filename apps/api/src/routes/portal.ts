@@ -28,7 +28,9 @@ portalRouter.get('/quote/:token', async (req: Request, res: Response) => {
     brand: await brand(quote.accountId),
     doc: {
       number: quote.number, title: quote.title, client: quote.client, propertyAddress: quote.propertyAddress,
-      lineItems: quote.lineItems, currency: quote.currency, taxRatePct: quote.taxRatePct, totals: quote.totals,
+      lineItems: quote.lineItems, currency: quote.currency, taxRatePct: quote.taxRatePct, taxLabel: quote.taxLabel,
+      depositType: quote.depositType, totals: quote.totals, summary: quote.summary,
+      accentColor: quote.accentColor, logoUrl: quote.logoUrl,
       notes: quote.notes, terms: quote.terms, validUntil: quote.validUntil, status: quote.status,
     },
   });

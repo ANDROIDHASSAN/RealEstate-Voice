@@ -13,6 +13,8 @@ const { createApp } = await import('../src/app.js');
 const { registerInstantReplyWorker } = await import('../src/workers/instant-reply.js');
 const { registerVoiceCallWorker } = await import('../src/workers/voice-call.js');
 const { registerPropertyAnalysisWorker } = await import('../src/workers/property-analysis.js');
+const { registerEvalWorkers } = await import('../src/workers/evals.js');
+const { registerApprovalExecutors } = await import('../src/lib/approval-executors.js');
 const { closeQueue } = await import('../src/lib/queue.js');
 
 let app: Express;
@@ -28,6 +30,8 @@ beforeAll(async () => {
   registerInstantReplyWorker();
   registerVoiceCallWorker();
   registerPropertyAnalysisWorker();
+  registerEvalWorkers();
+  registerApprovalExecutors();
   app = createApp();
 
   const a = await request(app).post('/auth/signup').send({
@@ -630,6 +634,115 @@ describe('quotations', () => {
   });
 });
 
+describe('quotations — templates, settings & advanced totals', () => {
+  let templateId = '';
+
+  it('taxes only taxable lines and excludes optional add-ons from the total', async () => {
+    const res = await request(app).post('/quotations').set('Authorization', `Bearer ${tokenA}`).send({
+      title: 'Advanced totals', client: { name: 'Nora', company: 'Acme Realty' }, currency: 'USD', taxRatePct: 10,
+      lineItems: [
+        { description: 'Taxable service', quantity: 1, unitPrice: 200, taxable: true },
+        { description: 'Tax-exempt fee', quantity: 1, unitPrice: 100, taxable: false },
+        { description: 'Optional upgrade', quantity: 1, unitPrice: 500, optional: true },
+      ],
+    });
+    expect(res.status).toBe(201);
+    const tot= res.body.quote.totals;
+    // subtotal excludes optional (200+100=300); tax only on the 200 taxable line (20).
+    expect(tot.subtotal).toBe(300);
+    expect(tot.taxAmount).toBe(20);
+    expect(tot.total).toBe(320);
+    expect(tot.optionalTotal).toBe(500);
+  });
+
+  it('applies a per-line discount and a deposit', async () => {
+    const res = await request(app).post('/quotations').set('Authorization', `Bearer ${tokenA}`).send({
+      title: 'Deposit quote', client: { name: 'Ivan' }, currency: 'USD',
+      depositType: 'percent', depositValue: 25,
+      lineItems: [{ description: 'Package', quantity: 1, unitPrice: 1000, discountPct: 10 }],
+    });
+    expect(res.status).toBe(201);
+    const totot = res.body.quote.totals;
+    expect(totot.subtotal).toBe(900); // 1000 − 10%
+    expect(totot.total).toBe(900);
+    expect(totot.depositAmount).toBe(225); // 25% of 900
+    expect(totot.balanceDue).toBe(675);
+  });
+
+  it('reads default quote settings, then updates categories + branding', async () => {
+    const get = await request(app).get('/quotations/settings').set('Authorization', `Bearer ${tokenA}`);
+    expect(get.status).toBe(200);
+    expect(Array.isArray(get.body.settings.categories)).toBe(true);
+    const put = await request(app).put('/quotations/settings').set('Authorization', `Bearer ${tokenA}`).send({
+      categories: ['Marketing', 'Closing', 'Marketing', ' Legal '], accentColor: '#8A6BE0', defaultCurrency: 'EUR',
+      defaultTaxRatePct: 7, defaultValidDays: 45, defaultTerms: 'Net 30', defaultNotes: '',
+    });
+    expect(put.status).toBe(200);
+    // De-duped + trimmed.
+    expect(put.body.settings.categories).toEqual(['Marketing', 'Closing', 'Legal']);
+    expect(put.body.settings.accentColor).toBe('#8A6BE0');
+  });
+
+  it('creates, lists, updates and deletes a custom template', async () => {
+    const created = await request(app).post('/quotations/templates').set('Authorization', `Bearer ${tokenA}`).send({
+      name: 'My Listing Combo', description: 'Reusable', category: 'Signature', terms: 'Due at closing',
+      lineItems: [{ description: 'Photos', category: 'Marketing', quantity: 1, unitPrice: 300 }],
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.template.custom).toBe(true);
+    expect(created.body.template.key).toMatch(/^custom:/);
+    templateId = created.body.template._id;
+
+    const list = await request(app).get('/quotations/templates').set('Authorization', `Bearer ${tokenA}`);
+    expect(list.body.templates.some((t: { key: string }) => t.key === 'listing-premium')).toBe(true);
+    expect(list.body.custom.some((t: { _id: string }) => t._id === templateId)).toBe(true);
+
+    const upd = await request(app).put(`/quotations/templates/${templateId}`).set('Authorization', `Bearer ${tokenA}`).send({
+      name: 'My Listing Combo v2', description: 'Reusable', category: 'Signature', terms: 'Due at closing',
+      lineItems: [{ description: 'Photos', category: 'Marketing', quantity: 1, unitPrice: 350 }],
+    });
+    expect(upd.status).toBe(200);
+    expect(upd.body.template.name).toBe('My Listing Combo v2');
+
+    const del = await request(app).delete(`/quotations/templates/${templateId}`).set('Authorization', `Bearer ${tokenA}`);
+    expect(del.status).toBe(200);
+  });
+
+  it('imports a template from an uploaded JSON payload', async () => {
+    const res = await request(app).post('/quotations/templates/import').set('Authorization', `Bearer ${tokenA}`).send({
+      template: { name: 'Imported Pack', category: 'Imported', lineItems: [{ description: 'X', quantity: 2, unitPrice: 50 }] },
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.template.name).toBe('Imported Pack');
+  });
+
+  it('saves a quote as a reusable template', async () => {
+    const q = await request(app).post('/quotations').set('Authorization', `Bearer ${tokenA}`).send({
+      title: 'Save me', client: { name: 'C' }, lineItems: [{ description: 'Svc', quantity: 1, unitPrice: 120 }],
+    });
+    const saved = await request(app).post(`/quotations/${q.body.quote._id}/save-as-template`).set('Authorization', `Bearer ${tokenA}`).send({ name: 'From Quote', category: 'Custom' });
+    expect(saved.status).toBe(201);
+    expect(saved.body.template.name).toBe('From Quote');
+    expect(saved.body.template.lineItems).toHaveLength(1);
+  });
+
+  it('keeps templates + settings tenant-scoped', async () => {
+    const created = await request(app).post('/quotations/templates').set('Authorization', `Bearer ${tokenA}`).send({
+      name: 'A-only', category: 'X', lineItems: [{ description: 'x', quantity: 1, unitPrice: 1 }],
+    });
+    const id = created.body.template._id;
+    const crossGet = await request(app).get('/quotations/templates').set('Authorization', `Bearer ${tokenB}`);
+    expect(crossGet.body.custom.some((t: { _id: string }) => t._id === id)).toBe(false);
+    const crossDel = await request(app).delete(`/quotations/templates/${id}`).set('Authorization', `Bearer ${tokenB}`);
+    expect(crossDel.status).toBe(404);
+  });
+
+  it('rejects an invalid custom template (Zod)', async () => {
+    const res = await request(app).post('/quotations/templates').set('Authorization', `Bearer ${tokenA}`).send({ name: 'x', lineItems: [] });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('owner suite — invoicing, deals, ledger, documents, portal', () => {
   // Account A is on the pro plan (has the owner-suite modules).
   let invoiceId = '';
@@ -930,6 +1043,104 @@ describe('CMS', () => {
   it('validates content input (Zod)', async () => {
     const res = await request(app).post('/cms').set('Authorization', `Bearer ${tokenA}`).send({ type: 'page' });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('agentops — evals, observability, approvals, self-correction', () => {
+  // Account A is on pro (no agentOps). Upgrade to ultimate to unlock the module.
+  beforeAll(async () => {
+    await request(app).post('/billing/subscribe').set('Authorization', `Bearer ${tokenA}`).send({ plan: 'ultimate' });
+  });
+
+  it('gates the module (fresh starter is blocked)', async () => {
+    const s = await request(app).post('/auth/signup').send({ accountName: 'AO Starter', name: 'Ada', email: `ao${Date.now()}@test.io`, password: 'Passw0rd!123' });
+    for (const path of ['/evals/stats', '/observability/stats', '/approvals']) {
+      expect((await request(app).get(path).set('Authorization', `Bearer ${s.body.accessToken}`)).status, path).toBe(403);
+    }
+  });
+
+  it('exposes eval stats and seeds the default suites', async () => {
+    const stats = await request(app).get('/evals/stats').set('Authorization', `Bearer ${tokenA}`);
+    expect(stats.status).toBe(200);
+    expect(stats.body).toHaveProperty('production');
+    expect(stats.body.suites).toHaveProperty('regression');
+    const seed = await request(app).post('/evals/cases/seed').set('Authorization', `Bearer ${tokenA}`);
+    expect(seed.body.count).toBeGreaterThan(0);
+    const cases = await request(app).get('/evals/cases').set('Authorization', `Bearer ${tokenA}`);
+    expect(cases.body.items.length).toBeGreaterThan(0);
+  });
+
+  it('runs a regression suite end-to-end (LLM-judge in heuristic/mock mode)', async () => {
+    const run = await request(app).post('/evals/run').set('Authorization', `Bearer ${tokenA}`).send({ suite: 'regression' });
+    expect(run.status).toBe(202);
+    const runId = run.body.runId;
+    let doc: { status: string; total?: number; passRate?: number } | undefined;
+    for (let i = 0; i < 30 && doc?.status !== 'done'; i += 1) {
+      await sleep(300);
+      doc = (await request(app).get(`/evals/runs/${runId}`).set('Authorization', `Bearer ${tokenA}`)).body.run;
+    }
+    expect(doc?.status).toBe('done');
+    expect(doc?.total).toBeGreaterThan(0);
+    expect(typeof doc?.passRate).toBe('number');
+  }, 20_000);
+
+  it('records observability traces for assistant commands and can replay one', async () => {
+    // Earlier assistant tests produced traced runs; make one more to be sure.
+    await request(app).post('/assistant/command').set('Authorization', `Bearer ${tokenA}`).send({ text: 'go to leads', locale: 'en' });
+    const stats = await request(app).get('/observability/stats').set('Authorization', `Bearer ${tokenA}`);
+    expect(stats.status).toBe(200);
+    expect(stats.body).toHaveProperty('latency');
+    const traces = await request(app).get('/observability/traces?kind=assistant').set('Authorization', `Bearer ${tokenA}`);
+    expect(traces.body.items.length).toBeGreaterThan(0);
+    const replay = await request(app).post(`/observability/traces/${traces.body.items[0]._id}/replay`).set('Authorization', `Bearer ${tokenA}`);
+    expect(replay.status).toBe(200);
+    expect(replay.body.traceId).toBeTruthy();
+  });
+
+  it('human-in-the-loop: gates a delete, then approving resumes and executes it', async () => {
+    // Turn on the delete gate.
+    const pol = await request(app).put('/approvals/policy').set('Authorization', `Bearer ${tokenA}`).send({ policy: { delete_record: true } });
+    expect(pol.status).toBe(200);
+    expect(pol.body.approvalPolicy.delete_record).toBe(true);
+
+    // Create a lead, then request its deletion — it should be parked, not deleted.
+    const lead = await request(app).post('/leads').set('Authorization', `Bearer ${tokenA}`).send({ firstName: 'Gate', lastName: 'Me', phone: '+13055557000' });
+    const leadId = lead.body.lead._id;
+    const del = await request(app).delete(`/leads/${leadId}`).set('Authorization', `Bearer ${tokenA}`);
+    expect(del.status).toBe(202);
+    expect(del.body.pendingApproval).toBe(true);
+    const approvalId = del.body.approvalId;
+
+    // Still present while pending.
+    expect((await request(app).get(`/leads/${leadId}`).set('Authorization', `Bearer ${tokenA}`)).status).toBe(200);
+
+    // It shows in the pending queue.
+    const queue = await request(app).get('/approvals?status=pending').set('Authorization', `Bearer ${tokenA}`);
+    expect(queue.body.items.some((a: { _id: string }) => a._id === approvalId)).toBe(true);
+
+    // Approve → executor resumes the delete.
+    const approve = await request(app).post(`/approvals/${approvalId}/approve`).set('Authorization', `Bearer ${tokenA}`).send({});
+    expect(approve.body.execution).toBe('executed');
+    expect((await request(app).get(`/leads/${leadId}`).set('Authorization', `Bearer ${tokenA}`)).status).toBe(404);
+  });
+
+  it('rejecting an approval discards the action', async () => {
+    const lead = await request(app).post('/leads').set('Authorization', `Bearer ${tokenA}`).send({ firstName: 'Keep', lastName: 'Me', phone: '+13055557001' });
+    const leadId = lead.body.lead._id;
+    const del = await request(app).delete(`/leads/${leadId}`).set('Authorization', `Bearer ${tokenA}`);
+    const approvalId = del.body.approvalId;
+    const reject = await request(app).post(`/approvals/${approvalId}/reject`).set('Authorization', `Bearer ${tokenA}`).send({});
+    expect(reject.body.status).toBe('rejected');
+    // Deciding again 409s; lead survives.
+    expect((await request(app).post(`/approvals/${approvalId}/approve`).set('Authorization', `Bearer ${tokenA}`).send({})).status).toBe(409);
+    expect((await request(app).get(`/leads/${leadId}`).set('Authorization', `Bearer ${tokenA}`)).status).toBe(200);
+  });
+
+  it('keeps agentops data tenant-scoped', async () => {
+    // B has the module (empire) but sees none of A's approvals — B created none.
+    const listB = await request(app).get('/approvals').set('Authorization', `Bearer ${tokenB}`);
+    expect(listB.status).toBe(200);
+    expect(listB.body.items).toHaveLength(0);
   });
 });
 

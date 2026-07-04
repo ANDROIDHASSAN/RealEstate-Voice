@@ -30,6 +30,9 @@ const PublicPortal = lazy(() => import('./pages/PublicPortal'));
 const Website = lazy(() => import('./pages/Website'));
 const Billing = lazy(() => import('./pages/Billing'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Evals = lazy(() => import('./pages/Evals'));
+const Observability = lazy(() => import('./pages/Observability'));
+const Approvals = lazy(() => import('./pages/Approvals'));
 const PublicSite = lazy(() => import('./pages/PublicSite'));
 
 const queryClient = new QueryClient({
@@ -51,7 +54,7 @@ function SuperAdminOnly({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Suspense fallback={<div className="p-10"><PageSkeleton /></div>}>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -83,6 +86,9 @@ export default function App() {
               <Route path="/documents" element={<ModuleGate module="documents"><Documents /></ModuleGate>} />
               <Route path="/cms" element={<ModuleGate module="cms"><Cms /></ModuleGate>} />
               <Route path="/website" element={<ModuleGate module="website"><Website /></ModuleGate>} />
+              <Route path="/evals" element={<ModuleGate module="agentOps"><Evals /></ModuleGate>} />
+              <Route path="/observability" element={<ModuleGate module="agentOps"><Observability /></ModuleGate>} />
+              <Route path="/approvals" element={<ModuleGate module="agentOps"><Approvals /></ModuleGate>} />
               <Route path="/team" element={<Team />} />
               <Route path="/admin" element={<SuperAdminOnly><Admin /></SuperAdminOnly>} />
               <Route path="/billing" element={<Billing />} />

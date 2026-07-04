@@ -3,6 +3,7 @@ import { createLeadSchema } from '@truecode/shared';
 import { z } from 'zod';
 import { getQueue, QUEUES } from '../lib/queue.js';
 import { rbacWrite, requireAuth, requireModule } from '../middleware/auth.js';
+import { requireApproval } from '../lib/approvals.js';
 import { Lead } from '../models.js';
 
 export const leadsRouter = Router();
@@ -38,6 +39,28 @@ leadsRouter.get('/:id', async (req: Request, res: Response) => {
   const lead = await Lead.findOne({ _id: req.params.id, accountId: req.auth!.accountId }).lean();
   if (!lead) return res.status(404).json({ error: 'not_found' });
   return res.json({ lead });
+});
+
+/** Delete a lead — an irreversible action, so it can be routed for approval. */
+leadsRouter.delete('/:id', async (req: Request, res: Response) => {
+  const accountId = req.auth!.accountId;
+  const lead = await Lead.findOne({ _id: req.params.id, accountId }).lean();
+  if (!lead) return res.status(404).json({ error: 'not_found' });
+
+  const gate = await requireApproval({
+    accountId,
+    action: 'delete_record',
+    title: `Delete lead ${lead.firstName}${lead.lastName ? ` ${lead.lastName}` : ''}`,
+    summary: `${lead.email ?? lead.phone ?? 'no contact'} · status ${lead.status}`,
+    payload: { model: 'Lead', id: String(lead._id) },
+    requestedBy: req.auth!.userId,
+    origin: 'leads/delete',
+    leadId: String(lead._id),
+  });
+  if (gate.gated) return res.status(202).json({ pendingApproval: true, approvalId: gate.approvalId });
+
+  await Lead.deleteOne({ _id: req.params.id, accountId });
+  return res.json({ ok: true });
 });
 
 /** Manual lead creation — flows through the same instant-reply pipeline. */

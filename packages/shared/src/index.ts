@@ -1,6 +1,7 @@
 export * from './modules.js';
 export * from './types.js';
 export * from './schemas.js';
+export * from './content-studio.js';
 export * from './voice-agents.js';
 export * from './crew-agents.js';
 export * from './lead-personas.js';
@@ -11,3 +12,4 @@ export * from './owner-suite.js';
 export * from './rbac.js';
 export * from './cms.js';
 export * from './sales-persona.js';
+export * from './agentops.js';

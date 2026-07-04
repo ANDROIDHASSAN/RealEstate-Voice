@@ -1,6 +1,19 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
-import { apify, getLLM, instagram, resend, stripe, twilio, video, whatsapp } from '@truecode/integrations';
+import {
+  apify,
+  facebook,
+  getLLM,
+  instagram,
+  metaAds,
+  resend,
+  storage,
+  stripe,
+  twilio,
+  video,
+  whatsapp,
+  youtube,
+} from '@truecode/integrations';
 import { getVoiceProvider, resetVoiceProvider } from '@truecode/voice';
 import { logger } from '../logger.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -138,6 +151,39 @@ export const PROVIDER_CATALOG: ProviderDef[] = [
     fields: [{ var: 'IG_ACCESS_TOKEN', label: 'Access token', secret: true }],
   },
   {
+    key: 'facebook',
+    name: 'Facebook Pages (publishing)',
+    docsUrl: 'https://developers.facebook.com/docs/pages-api',
+    fields: [
+      { var: 'FB_PAGE_ACCESS_TOKEN', label: 'Page access token', secret: true },
+      { var: 'FB_PAGE_ID', label: 'Page ID', secret: false },
+    ],
+  },
+  {
+    key: 'youtube',
+    name: 'YouTube (publishing)',
+    docsUrl: 'https://developers.google.com/youtube/v3',
+    fields: [{ var: 'YOUTUBE_ACCESS_TOKEN', label: 'OAuth access token', secret: true }],
+  },
+  {
+    key: 'metaAds',
+    name: 'Meta Ads & Ad Library (ads + competitor research)',
+    docsUrl: 'https://developers.facebook.com/docs/marketing-apis',
+    fields: [
+      { var: 'META_ADS_ACCESS_TOKEN', label: 'Marketing API access token', secret: true },
+      { var: 'META_AD_ACCOUNT_ID', label: 'Ad account ID (without act_)', secret: false },
+    ],
+  },
+  {
+    key: 'storage',
+    name: 'Media storage (Vercel Blob / Cloudinary)',
+    docsUrl: 'https://vercel.com/docs/storage/vercel-blob',
+    fields: [
+      { var: 'BLOB_READ_WRITE_TOKEN', label: 'Vercel Blob token', secret: true },
+      { var: 'CLOUDINARY_URL', label: 'Cloudinary URL', secret: true },
+    ],
+  },
+  {
     key: 'video',
     name: 'Video render (Creatomate / Higgsfield)',
     docsUrl: 'https://creatomate.com',
@@ -246,6 +292,10 @@ function providerInfo(key: string) {
     case 'stripe': return stripe.info;
     case 'apify': return apify.info;
     case 'instagram': return instagram.info;
+    case 'facebook': return facebook.info;
+    case 'youtube': return youtube.info;
+    case 'metaAds': return metaAds.info;
+    case 'storage': return storage.info;
     case 'video': return video.info;
     case 'voice': {
       const v = getVoiceProvider();

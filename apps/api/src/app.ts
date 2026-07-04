@@ -9,7 +9,10 @@ import { accountRouter } from './routes/account.js';
 import { adminRouter } from './routes/admin.js';
 import { appointmentsRouter } from './routes/appointments.js';
 import { assistantRouter } from './routes/assistant.js';
+import { approvalsRouter } from './routes/approvals.js';
 import { authRouter } from './routes/auth.js';
+import { evalsRouter } from './routes/evals.js';
+import { observabilityRouter } from './routes/observability.js';
 import { billingRouter, stripeWebhookHandler } from './routes/billing.js';
 import { callsRouter } from './routes/calls.js';
 import { cmsRouter } from './routes/cms.js';
@@ -101,6 +104,9 @@ export function createApp(): Express {
   app.use('/integrations', integrationsRouter);
   app.use('/knowledge', knowledgeRouter);
   app.use('/voice-agents', voiceAgentsRouter);
+  app.use('/evals', evalsRouter);
+  app.use('/observability', observabilityRouter);
+  app.use('/approvals', approvalsRouter);
 
   app.use((_req, res) => res.status(404).json({ error: 'not_found' }));
 

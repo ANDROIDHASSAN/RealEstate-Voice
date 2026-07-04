@@ -197,4 +197,7 @@ export const QUEUES = {
   contentPublish: 'content-publish',
   videoRender: 'video-render',
   propertyAnalysis: 'property-analysis',
+  adLaunch: 'ad-launch',
+  adSync: 'ad-sync',
+  eval: 'eval-run',
 } as const;
