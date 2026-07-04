@@ -1,4 +1,7 @@
 import 'express-async-errors';
+import { existsSync } from 'node:fs';
+import path, { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
@@ -42,6 +45,21 @@ import { websiteRouter } from './routes/website.js';
 export function createApp(): Express {
   const app = express();
   app.set('trust proxy', 1);
+
+  // Single-service deploy support: the built web app (when present) is served
+  // from THIS server and calls the API under /api/*. Strip that prefix so the
+  // routers (mounted at root — also used by webhooks, tests and the dev proxy)
+  // handle both /leads and /api/leads. Flagged so an unknown /api/* path still
+  // 404s as JSON rather than falling through to the SPA shell. No-op in the split
+  // deploy (the frontend uses an absolute API URL, so requests never carry /api).
+  app.use((req: Request & { isApi?: boolean }, _res, next) => {
+    if (req.url === '/api' || req.url.startsWith('/api/')) {
+      req.isApi = true;
+      req.url = req.url.slice(4) || '/';
+    }
+    next();
+  });
+
   app.use(helmet());
   // CORS — allow the configured web origin, local dev, and any Vercel/Render
   // deployment (incl. preview URLs) so the split web(Vercel)/api(Render) setup
@@ -73,6 +91,26 @@ export function createApp(): Express {
   app.get('/health', (_req, res) => {
     res.json({ ok: true, service: 'truecode-api', ts: new Date().toISOString() });
   });
+
+  // Serve the built SPA in a single-service deploy (API + web on ONE host, one
+  // URL). Active only when running the COMPILED server (…/dist/…) with a web
+  // build present — so local `tsx watch` dev (Vite serves the app) and the test
+  // runner are unaffected, and the split web/api deploy (no web build on the API
+  // host) skips it. Placed before the routers so a deep link like /leads renders
+  // the app; /api/* (stripped, flagged), /webhook/* and real files fall through.
+  const serverDir = dirname(fileURLToPath(import.meta.url));
+  const webDist = path.resolve(serverDir, '../../web/dist');
+  const serveWeb =
+    env.nodeEnv !== 'test' && serverDir.replace(/\\/g, '/').includes('/dist') && existsSync(webDist);
+  if (serveWeb) {
+    app.use(express.static(webDist, { index: false }));
+    app.use((req: Request & { isApi?: boolean }, res, next) => {
+      if (req.method !== 'GET' || req.isApi) return next();
+      if (req.path.startsWith('/webhook') || req.path.includes('.')) return next();
+      res.sendFile(path.join(webDist, 'index.html'));
+    });
+    logger.info({ webDist }, 'serving web app (single-service mode)');
+  }
 
   app.use('/auth', authRouter);
   app.use('/account', accountRouter);

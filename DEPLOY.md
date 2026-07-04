@@ -1,5 +1,34 @@
 # TrueCode AI OS — Deploy (one page)
 
+Two ways to ship it:
+- **Option A — ONE service, one URL (simplest).** The API serves the built web app from the same origin. Deploy the whole repo to a single always-on host (Railway/Fly/Render). No CORS, no split, everything works. → jump to **[§A](#a-single-service-one-url)**.
+- **Option B — split.** Web on Vercel + API on Render. → the sections below.
+
+---
+
+## A. Single service (one URL)
+
+The compiled server auto-serves `apps/web/dist` when it exists (see `app.ts`), and
+the frontend calls the API on the same origin under `/api/*` — so there's nothing
+to configure beyond the database.
+
+**Railway (recommended, `railway.json` already included):**
+1. Create a free **MongoDB Atlas M0** cluster → copy the `mongodb+srv://…` URI (URL-encode the password).
+2. Railway → **New Project → Deploy from GitHub repo** → pick this repo. It reads `railway.json` (build `npm run build`, start `npm start`, health `/health`).
+3. Add env vars: **`MONGO_URI`** (your Atlas URI) and **`NODE_ENV=production`**. Leave `VITE_API_URL` UNSET (same-origin). Provider keys optional — missing ⇒ mock mode.
+4. Deploy → you get one URL, e.g. `https://truecode-ai-os-production.up.railway.app`. That single URL is the whole app.
+5. Seed the demo: `curl -X POST https://<your-url>/api/auth/seed-demo` → login `demo@truecode.ai / Demo1234!`.
+
+Concurrency: one always-on instance + Atlas M0 comfortably serves ~100 light demo
+users (connection pooling — users share the pool). Keep `numReplicas: 1` unless you
+add a real `rediss://` Redis (the in-memory queue/live-feed are per-process).
+
+_Local prod check:_ `npm run build && npm start` → open `http://localhost:4100` (whole app on one port).
+
+---
+
+## B. Split — Vercel (web) + Render (api)
+
 Two live URLs to send realtors:
 - **Web (Vercel):** `https://<your-project>.vercel.app` — the dashboard
 - **API (Render):** `https://truecode-api.onrender.com` — webhook base for lead sources
