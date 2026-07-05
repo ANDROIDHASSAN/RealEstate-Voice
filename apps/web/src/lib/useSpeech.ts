@@ -79,10 +79,21 @@ export function useSpeech(
   const start = useCallback(() => {
     const rec = getRecognizer();
     if (!rec) return;
-    try {
-      recognizer.current?.abort();
-    } catch {
-      /* ignore */
+    // Tear down any previous recognizer FIRST — and detach its handlers before
+    // aborting. abort() fires onend asynchronously, a tick after we reset the
+    // shared flags below; if that stale onend still ran it would (falsely) think
+    // it ended on its own and trigger onIdleEnd → an endless ~300ms
+    // abort/restart churn that stops the 2nd command from ever being heard.
+    const prev = recognizer.current;
+    if (prev) {
+      prev.onend = null;
+      prev.onerror = null;
+      prev.onresult = null;
+      try {
+        prev.abort();
+      } catch {
+        /* ignore */
+      }
     }
     recognizer.current = rec;
     manualStop.current = false;
