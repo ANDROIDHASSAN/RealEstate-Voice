@@ -90,6 +90,13 @@ leadsRouter.post('/', requireModule('instantReply'), async (req: Request, res: R
 });
 
 const patchSchema = z.object({
+  firstName: z.string().min(1).max(80).optional(),
+  lastName: z.string().max(80).optional(),
+  phone: z.string().max(30).optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  location: z.string().max(200).optional(),
+  propertyInterest: z.string().max(300).optional(),
+  locale: z.enum(['en', 'es', 'ar', 'pt', 'ht']).optional(),
   status: z.enum(['new', 'contacted', 'qualified', 'appointment', 'nurture', 'won', 'lost', 'dnc']).optional(),
   intent: z.enum(['buyer', 'seller', 'renter', 'investor', 'unknown']).optional(),
   urgency: z.enum(['now', '1-3mo', '3-6mo', '6mo+', 'unknown']).optional(),
@@ -100,9 +107,12 @@ const patchSchema = z.object({
 leadsRouter.patch('/:id', async (req: Request, res: Response) => {
   const parsed = patchSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'invalid_input' });
+  // Empty strings clear optional contact fields rather than storing "".
+  const update: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(parsed.data)) update[k] = v === '' ? undefined : v;
   const lead = await Lead.findOneAndUpdate(
     { _id: req.params.id, accountId: req.auth!.accountId },
-    parsed.data,
+    update,
     { new: true },
   ).lean();
   if (!lead) return res.status(404).json({ error: 'not_found' });

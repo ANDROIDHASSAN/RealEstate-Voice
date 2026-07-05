@@ -64,6 +64,17 @@ const leadSchema = new Schema(
     budget: String,
     location: String,
     propertyInterest: String,
+    /** Everything captured from the lead source (Apify Google Places, etc.). */
+    scraped: {
+      businessName: String,
+      rating: Number,
+      reviewsCount: Number,
+      website: String,
+      category: String,
+      address: String,
+      googleMapsUrl: String,
+      sourceDetail: String,
+    },
     score: { type: Number, default: 0 },
     assignedTo: { type: Schema.Types.ObjectId, ref: 'User' },
     firstResponseSeconds: Number,

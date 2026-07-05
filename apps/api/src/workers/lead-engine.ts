@@ -52,6 +52,17 @@ export function registerLeadEngineWorkers(): void {
           location: p.location,
           propertyInterest: p.propertyInterest,
           source: 'scrape',
+          // Keep the full enrichment the scraper returned (shown in the UI).
+          scraped: {
+            businessName: p.businessName,
+            rating: p.rating,
+            reviewsCount: p.reviewsCount,
+            website: p.website,
+            category: p.category,
+            address: p.address,
+            googleMapsUrl: p.googleMapsUrl,
+            sourceDetail: p.sourceDetail,
+          },
           // Cold-scraped prospects have NO TCPA consent for calls/SMS.
           // Email-first outreach only; ComplianceGuard enforces this.
           consent: { sms: false, call: false, whatsapp: false, email: true },
