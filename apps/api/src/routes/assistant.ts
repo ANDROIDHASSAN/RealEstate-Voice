@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import {
   assistantPlanSchema,
   buildPersonaQuery,
+  computeTotals,
   getLeadPersona,
   LEAD_PERSONAS,
 } from '@truecode/shared';
@@ -12,7 +13,7 @@ import { emitAgentEvent } from '../lib/events.js';
 import { getTracedLLM, withTrace } from '../lib/observability.js';
 import { getQueue, QUEUES } from '../lib/queue.js';
 import { sendOutbound } from '../lib/outbound.js';
-import { Account, Appointment, Lead, ScrapeJob } from '../models.js';
+import { Account, Appointment, Invoice, Lead, ScrapeJob } from '../models.js';
 
 /**
  * TrueCode AI Assistant — one natural-language command (typed or voice) in, a
@@ -264,6 +265,9 @@ async function planWithLLM(text: string, context: AssistantContext, locale: stri
           'orchestrate {leadName, goal}',
           'set_language {locale: en|es|ar|pt|ht}',
           'answer {}  — questions about their data; put the answer (use the CONTEXT numbers) in reply.',
+          'create_invoice {clientName?, amount?, description?}  — create a DRAFT invoice ("create an invoice for John for 5000"). Amount is a number (no currency symbol).',
+          'book_appointment {leadName, when?}  — book a meeting/appointment with a named existing lead ("book a meeting with Maria tomorrow").',
+          "generate_report {}  — a spoken business summary (leads, appointments, revenue) from the CONTEXT + account numbers. Put the summary in reply.",
           'clarify {}  — only when a REQUIRED param is truly missing; ask ONE question in reply.',
           'RULES:',
           '- Scraped/cold leads have NO call or SMS consent — ComplianceGuard WILL block SMS/calls to them. If asked to message or call freshly-scraped leads, say the scrape has started and that as leads arrive they get a compliant intro EMAIL automatically, and that calls/SMS are blocked until they opt in. Do not promise blocked actions.',
@@ -325,6 +329,27 @@ function parseClause(t: string, context: AssistantContext, scrapedThisTurn: bool
     if (t.includes(`language to ${name}`) || t === `switch to ${name}` || t.includes(`speak ${name}`)) {
       return { action: 'set_language', params: { locale: code }, reply: `Switching the dashboard to ${name}.` };
     }
+  }
+
+  // business report ("generate a report", "how's my business")
+  if (/\b(business (report|summary)|generate (a |me )?(report|summary)|how('?s| is) (my )?business|give me (a |my )?report|report card)\b/.test(t)) {
+    return { action: 'generate_report', params: {}, reply: '' };
+  }
+
+  // create invoice ("create an invoice for John for 5000")
+  const inv = t.match(/(?:create|make|new|generate|raise|draft)\s+(?:an?\s+)?invoice(?:\s+(?:for|to)\s+([a-z' ]+?))?(?:\s+(?:for|of)\s+\$?([\d,]+(?:\.\d+)?))?$/);
+  if (inv) {
+    return {
+      action: 'create_invoice',
+      params: { clientName: inv[1] ? titleCase(inv[1].trim()) : undefined, amount: inv[2] ? Number(inv[2].replace(/,/g, '')) : undefined },
+      reply: '',
+    };
+  }
+
+  // book appointment ("book a meeting with Maria", "schedule a call with John")
+  const appt = t.match(/(?:book|schedule|set up|arrange)\s+(?:a\s+)?(?:meeting|appointment|call|consult(?:ation)?)\s+(?:with\s+)?([a-z' ]+?)(?:\s+(now|today|tomorrow|this week|next week))?$/);
+  if (appt?.[1] && !/them|all|leads?/.test(appt[1])) {
+    return { action: 'book_appointment', params: { leadName: titleCase(appt[1].trim()), when: appt[2] }, reply: '' };
   }
 
   // questions about their data ("how many leads do I have?")
@@ -616,6 +641,84 @@ async function executeAction(
       const lead = await findLeadByName(accountId, String(p.leadName ?? ''));
       if (!lead) return { reply: `I couldn't find a lead matching "${p.leadName}".` };
       return { clientAction: { type: 'orchestrate', leadId: String(lead._id), goal: String(p.goal ?? 'move this lead forward') } };
+    }
+
+    // ---- Voice Orchestrator: "do it" actions routed to specialized agents ----
+    case 'create_invoice': {
+      if (!context.modules.includes('invoicing')) {
+        return { reply: 'Invoicing is not on your plan — upgrade to Pro to create invoices.' };
+      }
+      const clientName = String(p.clientName ?? '').trim() || 'New client';
+      const amount = Number(p.amount) || 0;
+      const description = String(p.description ?? '').trim() || 'Professional services';
+      const lineItems = [{ description, quantity: 1, unitPrice: amount }];
+      const totals = computeTotals(lineItems, { taxRatePct: 0, discountType: 'none', discountValue: 0 });
+      const count = await Invoice.countDocuments({ accountId });
+      const invoice = await Invoice.create({
+        accountId,
+        number: `INV-${new Date().getUTCFullYear()}-${String(count + 1).padStart(4, '0')}`,
+        title: `Invoice for ${clientName}`,
+        client: { name: clientName, email: '' },
+        lineItems,
+        currency: 'USD',
+        taxRatePct: 0,
+        discountType: 'none',
+        discountValue: 0,
+        totals,
+        dueDate: new Date(Date.now() + 14 * 24 * 3600 * 1000),
+        amountPaid: 0,
+        balance: totals.total,
+        status: 'draft',
+      });
+      steps.push({ agentKey: 'invoice-agent', title: `Draft invoice ${invoice.number} created`, detail: `${clientName} · $${totals.total}`, status: 'done' });
+      return {
+        reply: amount
+          ? `Created draft invoice ${invoice.number} for ${clientName} — total $${totals.total}. Opening it now.`
+          : `Created a draft invoice for ${clientName}. Add the amount and line items on the invoice page.`,
+        clientAction: { type: 'navigate', path: '/invoicing' },
+      };
+    }
+
+    case 'book_appointment': {
+      const lead = await findLeadByName(accountId, String(p.leadName ?? ''));
+      if (!lead) return { reply: `I couldn't find a lead matching "${p.leadName}". Add them first, then I can book a meeting.` };
+      const when = String(p.when ?? 'tomorrow').toLowerCase();
+      const startsAt = new Date();
+      const dayOffset = when.includes('today') || when.includes('now') ? 0 : when.includes('next week') ? 7 : 1;
+      startsAt.setDate(startsAt.getDate() + dayOffset);
+      startsAt.setHours(15, 0, 0, 0);
+      const appointment = await Appointment.create({
+        accountId,
+        leadId: lead._id,
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + 30 * 60_000),
+        type: 'buyer-consult',
+        calendarEventId: `cf_asst_${lead._id}_${startsAt.getTime()}`,
+      });
+      steps.push({ agentKey: 'scheduler', title: `Meeting booked with ${lead.firstName}`, detail: startsAt.toLocaleString(), status: 'done' });
+      return {
+        reply: `Booked a meeting with ${lead.firstName} for ${startsAt.toLocaleString()}. It's on the calendar.`,
+        clientAction: { type: 'navigate', path: '/' },
+      };
+    }
+
+    case 'generate_report': {
+      const parts: string[] = [
+        `${context.totalLeads} lead${context.totalLeads === 1 ? '' : 's'} total, ${context.leadsThisWeek} new this week`,
+        `${context.appointmentsThisWeek} appointment${context.appointmentsThisWeek === 1 ? '' : 's'} booked this week`,
+      ];
+      const breakdown = Object.entries(context.leadCounts).sort((a, b) => b[1] - a[1]).map(([s, n]) => `${n} ${s}`).join(', ');
+      if (context.modules.includes('invoicing')) {
+        const invs = await Invoice.find({ accountId }).select('status amountPaid balance').lean();
+        const collected = invs.reduce((s, i) => s + (i.status !== 'void' ? Number(i.amountPaid ?? 0) : 0), 0);
+        const outstanding = invs.reduce((s, i) => s + (i.status !== 'void' ? Number(i.balance ?? 0) : 0), 0);
+        if (invs.length) parts.push(`$${Math.round(collected).toLocaleString()} collected and $${Math.round(outstanding).toLocaleString()} outstanding across ${invs.length} invoice${invs.length === 1 ? '' : 's'}`);
+      }
+      steps.push({ agentKey: 'reporting-insights', title: 'Business report generated', detail: breakdown || undefined, status: 'done' });
+      return {
+        reply: `Here's your business snapshot: ${parts.join('; ')}.${breakdown ? ` Lead breakdown — ${breakdown}.` : ''}`,
+        clientAction: { type: 'navigate', path: '/' },
+      };
     }
 
     default:

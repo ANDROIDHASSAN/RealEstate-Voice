@@ -111,6 +111,10 @@ export const ASSISTANT_ACTIONS = [
   'set_language',
   'answer',
   'clarify',
+  // Voice Orchestrator — "do it" actions routed to specialized agents.
+  'create_invoice',
+  'book_appointment',
+  'generate_report',
 ] as const;
 
 export const assistantActionSchema = z.object({

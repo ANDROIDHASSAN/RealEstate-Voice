@@ -174,6 +174,14 @@ export const CREW_AGENTS: CrewAgentConfig[] = [
     emits: ['report'],
     status: 'ready',
   },
+  {
+    key: 'invoice-agent',
+    name: 'Invoice Agent',
+    role: 'Finance assistant',
+    goal: 'Draft invoices and quotes from a voice/text command; keep money math server-authoritative.',
+    emits: ['createInvoice', 'createQuote'],
+    status: 'live',
+  },
 ];
 
 export function getCrewAgent(key: string): CrewAgentConfig | undefined {
